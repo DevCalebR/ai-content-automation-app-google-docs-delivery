@@ -69,7 +69,7 @@ SEED_DEMO_PASSWORD=Phase1DemoPass!
 
 ```bash
 npm run db:generate
-npx prisma migrate dev --name init
+npm run db:migrate:dev -- --name init
 ```
 
 4. Seed the system presets:
@@ -91,9 +91,12 @@ npm run dev
 npm run lint
 npm run typecheck
 npm run test
+npm run validate
 npm run db:generate
 npm run db:migrate
+npm run db:migrate:deploy
 npm run db:seed
+npm run db:studio
 npm run build
 ```
 
@@ -155,7 +158,7 @@ Focused hardening tests use Vitest in Node mode. The current suite covers secure
 ## Validation used for this Phase 1 build
 
 - `npm install`
-- `npx prisma migrate dev --name phase1_foundation`
+- `npm run db:migrate:dev -- --name phase1_foundation`
 - `npm run db:seed`
 - `npm run lint`
 - `npm run typecheck`

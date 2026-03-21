@@ -32,7 +32,7 @@ NODE_ENV=production
 3. Run migrations against production:
 
 ```bash
-npx prisma migrate deploy
+npm run db:migrate:deploy
 ```
 
 4. Build and deploy the Next.js application.
