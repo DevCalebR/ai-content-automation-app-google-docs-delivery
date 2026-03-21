@@ -5,7 +5,10 @@
 - `app/api/auth/[...nextauth]/route.ts`
 - Credentials auth verifies email and bcrypt password hash.
 - Sessions are stored in the database via the Prisma adapter.
-- Registration writes the user server-side, then redirects to `/sign-in` with a success state. The password is never echoed back in a server action response.
+- Registration writes the user server-side, sends verification email, then redirects to `/sign-in` with a success state. The password is never echoed back in a server action response.
+- Password reset requests return generic success copy to avoid leaking account existence.
+- Verification and reset tokens are hashed before persistence.
+- Database-backed `SecurityEvent` records support auth rate limiting.
 
 ## Server actions
 
@@ -39,6 +42,11 @@ Phase 1 uses server actions for core app mutations rather than large API route h
 - Persists `StructuredOutput`
 - Updates run status
 - Writes `UsageEvent`
+
+### Owner-only workspace settings
+
+- Workspace authorization is resolved centrally in `lib/workspaces/service.ts`
+- Owner-only settings mutations reject members even if they have general workspace access
 
 ## OpenAI boundary
 

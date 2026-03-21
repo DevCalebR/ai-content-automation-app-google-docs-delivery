@@ -16,7 +16,7 @@ Phase 1 delivers the production foundation for a SaaS content automation platfor
 
 Phase 1 uses `next-auth` credentials auth with Prisma-backed sessions because it is production-capable, works cleanly with App Router, keeps identity data in the same durable database model as the rest of the product, and leaves room for OAuth providers later without forcing a redesign of users, sessions, or workspace ownership.
 
-The sign-up flow is intentionally secure: after registration, the server redirects the user to `/sign-in` with a success state. The raw password is never returned from the server to the client.
+The sign-up flow is intentionally secure: after registration, the server redirects the user to `/sign-in` with a success state. The raw password is never returned from the server to the client. Phase 2 adds email verification, password reset, and database-backed auth rate limiting.
 
 ## What Phase 1 includes
 
@@ -53,6 +53,12 @@ OPENAI_MODEL=gpt-5.4-mini
 APP_URL=http://localhost:3000
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=replace-with-a-32-character-secret
+EMAIL_FROM=AI Content Automation <no-reply@example.com>
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_SECURE=false
 NODE_ENV=development
 SEED_DEMO_ACCOUNT=false
 SEED_DEMO_EMAIL=demo@example.com
@@ -96,6 +102,10 @@ npm run build
 - `/` marketing site
 - `/sign-in` auth
 - `/sign-up` auth
+- `/verify-email` email verification landing
+- `/verify-email/resend` resend verification flow
+- `/forgot-password` password reset request
+- `/reset-password` password reset completion
 - `/app` dashboard
 - `/app/onboarding` workspace creation
 - `/app/workspaces/[workspaceId]` structured brief intake + saved briefs
@@ -140,7 +150,7 @@ The Phase 1 run stores:
 
 ## Test stack
 
-Focused hardening tests use Vitest in Node mode. The current suite covers secure sign-up behavior, credential authorization after registration, explicit workspace owner creation, membership default roles, and workspace access checks.
+Focused hardening tests use Vitest in Node mode. The current suite covers secure sign-up redirects, email verification gating, password reset, DB-backed auth rate limiting, explicit workspace owner creation, owner/member authorization boundaries, membership default roles, and workspace access checks.
 
 ## Validation used for this Phase 1 build
 

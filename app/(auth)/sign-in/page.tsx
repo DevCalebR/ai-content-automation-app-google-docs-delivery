@@ -6,16 +6,25 @@ import { Panel } from "@/components/ui/panel";
 import { authOptions } from "@/lib/auth/options";
 
 type PageProps = {
-  searchParams: Promise<{ registered?: string; email?: string }>;
+  searchParams: Promise<{ registered?: string; verified?: string; reset?: string; email?: string }>;
 };
 
 export default async function SignInPage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
-  const { registered, email } = await searchParams;
+  const { registered, verified, reset, email } = await searchParams;
 
   if (session?.user?.id) {
     redirect("/app");
   }
+
+  const successMessage =
+    verified === "1"
+      ? "Email verified. Sign in to continue."
+      : reset === "1"
+        ? "Password updated. Sign in with your new password."
+        : registered === "1"
+          ? "If the address can receive access here, check your inbox for a verification link, then sign in."
+          : undefined;
 
   return (
     <main className="grid min-h-screen items-center px-6 py-12 lg:px-10">
@@ -41,16 +50,12 @@ export default async function SignInPage({ searchParams }: PageProps) {
         <Panel className="p-8">
           <p className="text-2xl font-medium text-[var(--ink)]">Sign in</p>
           <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-            Use the credentials you created for this workspace account.
+            Use your verified email and password to open the workspace.
           </p>
           <div className="mt-8">
             <SignInFormFields
               defaultEmail={email}
-              successMessage={
-                registered === "1"
-                  ? "Account created. Sign in to continue into your workspace."
-                  : undefined
-              }
+              successMessage={successMessage}
             />
           </div>
         </Panel>

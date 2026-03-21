@@ -22,13 +22,14 @@ export default async function SignUpPage() {
           <p className="mt-5 max-w-xl text-lg leading-8 text-[var(--ink-soft)]">
             You’ll start with workspace onboarding, reusable presets, structured brief
             intake, and a saved run/results shell built on durable Postgres persistence.
+            New credential accounts now verify email before first sign-in.
           </p>
         </div>
         <Panel className="p-8">
           <p className="text-2xl font-medium text-[var(--ink)]">Create account</p>
           <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-            Start with email/password auth and add more providers later without changing
-            the workspace data model.
+            Start with verified email/password auth and add more providers later without
+            changing the workspace data model.
           </p>
           <div className="mt-8">
             <SignUpForm />

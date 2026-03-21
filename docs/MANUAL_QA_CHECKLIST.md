@@ -3,7 +3,12 @@
 ## Auth
 
 - Sign up creates a new user and redirects to sign-in with a success message.
+- New users cannot sign in before verifying email.
+- Verification link marks the email as verified and allows sign-in.
+- Resend verification flow returns generic success copy.
 - Sign in accepts valid credentials and rejects invalid ones.
+- Forgot password returns generic success copy whether or not the account exists.
+- Reset password updates the password and invalidates active sessions.
 - Sign out returns to the marketing site.
 - Visiting `/app` while signed out redirects to `/sign-in`.
 
@@ -36,6 +41,7 @@
 ## Settings
 
 - Workspace settings can be updated by the owner.
+- Workspace members see read-only settings state and cannot perform owner-only mutations.
 - Integrations section shows durable Google Docs readiness state without dead action buttons.
 
 ## Final validation

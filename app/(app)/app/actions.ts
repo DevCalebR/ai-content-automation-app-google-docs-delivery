@@ -14,6 +14,7 @@ import type { ActionState } from "@/components/ui/form-state";
 import {
   createWorkspaceWithOwner,
   getWorkspaceAccessForUser,
+  getWorkspaceAuthorizationForUser,
 } from "@/lib/workspaces/service";
 
 const idleState: ActionState = {
@@ -357,14 +358,9 @@ export async function updateWorkspaceSettingsAction(
     };
   }
 
-  const workspace = await db.workspace.findFirst({
-    where: {
-      id: workspaceId,
-      ownerId: session.user.id,
-    },
-  });
+  const authorization = await getWorkspaceAuthorizationForUser(workspaceId, session.user.id);
 
-  if (!workspace) {
+  if (!authorization || !authorization.isOwner) {
     return {
       status: "error",
       message: "Only workspace owners can update settings.",
@@ -372,15 +368,15 @@ export async function updateWorkspaceSettingsAction(
   }
 
   await db.workspace.update({
-    where: { id: workspace.id },
+    where: { id: authorization.workspace.id },
     data: {
       name: parsed.data.name,
       description: parsed.data.description || undefined,
     },
   });
 
-  revalidatePath(`/app/workspaces/${workspace.id}/settings`);
-  revalidatePath(`/app/workspaces/${workspace.id}`);
+  revalidatePath(`/app/workspaces/${authorization.workspace.id}/settings`);
+  revalidatePath(`/app/workspaces/${authorization.workspace.id}`);
 
   return {
     status: "success",

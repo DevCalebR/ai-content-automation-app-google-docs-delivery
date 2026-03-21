@@ -3,8 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { WorkspaceSettingsForm } from "@/components/app/workspace-settings-form";
 import { requireSession } from "@/lib/auth/session";
-import { getWorkspaceForUser } from "@/lib/data/workspaces";
 import { db } from "@/lib/db";
+import { getWorkspaceAuthorizationForUser } from "@/lib/workspaces/service";
 
 type PageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -13,11 +13,13 @@ type PageProps = {
 export default async function SettingsPage({ params }: PageProps) {
   const session = await requireSession();
   const { workspaceId } = await params;
-  const workspace = await getWorkspaceForUser(workspaceId, session.user.id);
+  const authorization = await getWorkspaceAuthorizationForUser(workspaceId, session.user.id);
 
-  if (!workspace) {
+  if (!authorization) {
     notFound();
   }
+
+  const workspace = authorization.workspace;
 
   const integration = await db.integrationConnection.findFirst({
     where: {
@@ -34,12 +36,21 @@ export default async function SettingsPage({ params }: PageProps) {
           Workspace settings and integration readiness
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Phase 1 includes editable workspace settings plus a durable integration model for
-          Google Docs delivery. The connection flow itself is intentionally deferred to
-          Phase 2 rather than hidden behind dead buttons.
+          Owners can manage workspace metadata and future integrations here. Members have
+          read-only visibility into the same workspace readiness context.
         </p>
+        <div className="mt-6">
+          <Badge>{authorization.isOwner ? "OWNER" : authorization.membership.role}</Badge>
+        </div>
         <div className="mt-8">
-          <WorkspaceSettingsForm workspace={workspace} />
+          {authorization.isOwner ? (
+            <WorkspaceSettingsForm workspace={workspace} />
+          ) : (
+            <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
+              Only workspace owners can change settings or manage future integrations. You
+              can still create briefs, run generations, and review saved outputs.
+            </div>
+          )}
         </div>
       </Panel>
       <Panel className="p-7">

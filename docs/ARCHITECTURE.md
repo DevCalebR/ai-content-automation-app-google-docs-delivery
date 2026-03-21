@@ -34,6 +34,9 @@ Phase 1 establishes a production-first SaaS foundation for structured content pl
 - database session strategy
 - protected app layout via server-side session enforcement
 - sign-up redirects to sign-in with a success state instead of returning credentials
+- credentials sign-in requires verified email
+- password reset and email verification tokens are stored hashed in the database
+- auth abuse protection uses database-backed security events and rate limiting
 
 This keeps auth durable and self-contained without depending on a third-party hosted identity product in Phase 1.
 
@@ -55,3 +58,4 @@ This keeps auth durable and self-contained without depending on a third-party ho
 - richer output families can extend `StructuredOutput.rawOutput` and add typed renderers
 - background workers can adopt the existing `GenerationRun.status` lifecycle
 - billing and quotas can key off `UsageEvent`
+- SMTP delivery can be swapped for another transactional email provider behind the same email service boundary

@@ -70,6 +70,14 @@ export function SignInFormFields({
       <Button className="w-full" size="lg" type="submit" disabled={isPending}>
         {isPending ? "Signing in..." : "Sign in"}
       </Button>
+      <div className="flex items-center justify-between gap-3 text-sm text-[var(--ink-soft)]">
+        <Link className="font-medium text-[var(--ink)]" href={`/forgot-password${defaultEmail ? `?email=${encodeURIComponent(defaultEmail)}` : ""}`}>
+          Forgot password?
+        </Link>
+        <Link className="font-medium text-[var(--ink)]" href={`/verify-email/resend${defaultEmail ? `?email=${encodeURIComponent(defaultEmail)}` : ""}`}>
+          Resend verification
+        </Link>
+      </div>
       <p className="text-sm text-[var(--ink-soft)]">
         New here?{" "}
         <Link className="font-medium text-[var(--ink)]" href="/sign-up">

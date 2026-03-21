@@ -4,7 +4,7 @@ import { logAuditEvent } from "@/lib/logger";
 import { slugify } from "@/lib/utils";
 
 type WorkspaceDatabase = Pick<PrismaClient, "workspace" | "usageEvent">;
-type WorkspaceAccessDatabase = Pick<PrismaClient, "workspace">;
+type WorkspaceAccessDatabase = Pick<PrismaClient, "workspace" | "workspaceMembership">;
 
 export async function createWorkspaceWithOwner(
   input: {
@@ -79,4 +79,37 @@ export async function getWorkspaceAccessForUser(
       },
     },
   });
+}
+
+export async function getWorkspaceAuthorizationForUser(
+  workspaceId: string,
+  userId: string,
+  database: WorkspaceAccessDatabase = db,
+) {
+  const membership = await database.workspaceMembership.findUnique({
+    where: {
+      workspaceId_userId: {
+        workspaceId,
+        userId,
+      },
+    },
+  });
+
+  if (!membership) {
+    return null;
+  }
+
+  const workspace = await database.workspace.findUnique({
+    where: { id: workspaceId },
+  });
+
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    workspace,
+    membership,
+    isOwner: workspace.ownerId === userId || membership.role === "OWNER",
+  };
 }

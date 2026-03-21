@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWorkspaceWithOwner, getWorkspaceAccessForUser } from "@/lib/workspaces/service";
+import {
+  createWorkspaceWithOwner,
+  getWorkspaceAccessForUser,
+  getWorkspaceAuthorizationForUser,
+} from "@/lib/workspaces/service";
 import { runWithRollback } from "@/tests/helpers/transactions";
 
 describe("workspace ownership and membership defaults", () => {
@@ -65,9 +69,22 @@ describe("workspace ownership and membership defaults", () => {
 
       const memberAccess = await getWorkspaceAccessForUser(workspace.id, member.id, tx);
       const outsiderAccess = await getWorkspaceAccessForUser(workspace.id, outsider.id, tx);
+      const ownerAuthorization = await getWorkspaceAuthorizationForUser(
+        workspace.id,
+        owner.id,
+        tx,
+      );
+      const memberAuthorization = await getWorkspaceAuthorizationForUser(
+        workspace.id,
+        member.id,
+        tx,
+      );
 
       expect(memberAccess?.id).toBe(workspace.id);
       expect(outsiderAccess).toBeNull();
+      expect(ownerAuthorization?.isOwner).toBe(true);
+      expect(memberAuthorization?.isOwner).toBe(false);
+      expect(memberAuthorization?.membership.role).toBe("MEMBER");
     });
   });
 });
