@@ -1,36 +1,160 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Content Automation App with Google Docs Delivery
 
-## Getting Started
+Phase 1 delivers the production foundation for a SaaS content automation platform. A signed-in user can create a workspace, save structured content briefs, reuse presets, launch a real OpenAI-backed generation run, review saved run history, and open a polished results workspace backed by PostgreSQL persistence.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router
+- TypeScript
+- Tailwind CSS v4
+- Prisma + PostgreSQL
+- NextAuth credentials auth + Prisma adapter
+- Zod validation
+- OpenAI official SDK with the Responses API
+
+## Why this auth choice
+
+Phase 1 uses `next-auth` credentials auth with Prisma-backed sessions because it is production-capable, works cleanly with App Router, keeps identity data in the same durable database model as the rest of the product, and leaves room for OAuth providers later without forcing a redesign of users, sessions, or workspace ownership.
+
+The sign-up flow is intentionally secure: after registration, the server redirects the user to `/sign-in` with a success state. The raw password is never returned from the server to the client.
+
+## What Phase 1 includes
+
+- Landing page and polished SaaS app shell
+- Sign up, sign in, sign out, protected routes, and first-run onboarding
+- Durable data models for users, workspaces, memberships, presets, content briefs, generation runs, structured outputs, usage events, and integration placeholders
+- Seeded system presets:
+  - Real Estate
+  - Coach / Consultant
+  - SaaS / Productized Service
+  - E-commerce
+  - Local Business
+  - Creator Brand
+- Structured brief intake with save, edit, and duplicate flows
+- Real OpenAI generation path using structured outputs
+- Saved run history and results tabs
+- Settings shell with integration readiness model for future Google Docs delivery
+
+## Local setup
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy `.env.example` into `.env` and fill in:
+
+```env
+DATABASE_URL=
+DIRECT_DATABASE_URL=
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.4-mini
+APP_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=replace-with-a-32-character-secret
+NODE_ENV=development
+SEED_DEMO_ACCOUNT=false
+SEED_DEMO_EMAIL=demo@example.com
+SEED_DEMO_PASSWORD=Phase1DemoPass!
+```
+
+3. Generate the Prisma client and run migrations:
+
+```bash
+npm run db:generate
+npx prisma migrate dev --name init
+```
+
+4. Seed the system presets:
+
+```bash
+npm run db:seed
+```
+
+5. Start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Useful scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev
+npm run lint
+npm run typecheck
+npm run test
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## App routes
 
-## Learn More
+- `/` marketing site
+- `/sign-in` auth
+- `/sign-up` auth
+- `/app` dashboard
+- `/app/onboarding` workspace creation
+- `/app/workspaces/[workspaceId]` structured brief intake + saved briefs
+- `/app/workspaces/[workspaceId]/generate` run launch
+- `/app/workspaces/[workspaceId]/history` saved run history
+- `/app/workspaces/[workspaceId]/results/[runId]` results workspace
+- `/app/workspaces/[workspaceId]/settings` settings and integration readiness
 
-To learn more about Next.js, take a look at the following resources:
+## Generation architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The OpenAI integration is deliberately separated into small server modules:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `lib/ai/client.ts` initializes the official SDK server-side only
+- `lib/ai/prompts.ts` separates system instructions, preset instructions, and user brief composition
+- `lib/ai/safety.ts` applies pre-generation guardrails
+- `lib/ai/generate.ts` calls the Responses API with schema-backed parsing
+- `lib/validations/generation.ts` defines the normalized Phase 1 output contract
 
-## Deploy on Vercel
+The Phase 1 run stores:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- campaign summary
+- sample calendar entries
+- sample captions
+- hashtag sets
+- image prompts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Data model summary
+
+- `User` owns auth identity and sessions
+- `Workspace` is the tenant boundary for briefs, runs, outputs, and integration state
+- `WorkspaceMembership` records ownership and future team expansion
+- `Preset` supports system presets and future workspace-scoped presets
+- `ContentBrief` stores normalized brief fields plus a JSON snapshot
+- `GenerationRun` tracks run status, model, errors, and output linkage
+- `StructuredOutput` stores the normalized generated result
+- `UsageEvent` is the audit-friendly event placeholder
+- `IntegrationConnection` is the durable placeholder for Google Docs delivery auth
+
+## Seed notes
+
+`npm run db:seed` always installs the system presets. If `SEED_DEMO_ACCOUNT=true`, it also creates a demo user, workspace, and starter brief for local review.
+
+## Test stack
+
+Focused hardening tests use Vitest in Node mode. The current suite covers secure sign-up behavior, credential authorization after registration, explicit workspace owner creation, membership default roles, and workspace access checks.
+
+## Validation used for this Phase 1 build
+
+- `npm install`
+- `npx prisma migrate dev --name phase1_foundation`
+- `npm run db:seed`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+
+## Phase 2 candidates
+
+- Google OAuth + Docs export flow
+- background job execution for long generations
+- billing and quota enforcement
+- richer output families such as carousels and scripts
+- workspace collaboration beyond owner-only flows
