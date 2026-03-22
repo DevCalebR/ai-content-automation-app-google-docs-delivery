@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
+enum BriefStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum UsageEventType {
+  AUTH_SIGN_UP
+  AUTH_SIGN_IN
+  WORKSPACE_CREATED
+  BRIEF_SAVED
+  BRIEF_DUPLICATED
+  GENERATION_REQUESTED
+  GENERATION_COMPLETED
+  GENERATION_FAILED
+}
+
+enum IntegrationProvider {
+  GOOGLE_DOCS
+}
+
+enum IntegrationStatus {
+  NOT_CONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum SecurityEventType {
+  SIGN_UP_ATTEMPT
+  SIGN_IN_ATTEMPT
+  PASSWORD_RESET_REQUEST
+  EMAIL_VERIFICATION_RESEND
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  name                   String?
+  email                  String                  @unique
+  emailVerified          DateTime?
+  image                  String?
+  passwordHash           String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  accounts               Account[]
+  sessions               Session[]
+  ownedWorkspaces        Workspace[]             @relation("WorkspaceOwner")
+  memberships            WorkspaceMembership[]
+  presets                Preset[]
+  briefs                 ContentBrief[]
+  generationRuns         GenerationRun[]
+  usageEvents            UsageEvent[]
+  integrationConnections IntegrationConnection[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens    PasswordResetToken[]
+  securityEvents         SecurityEvent[]
+}
+
+model Workspace {
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  description            String?
+  ownerId                String
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  owner                  User                    @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships            WorkspaceMembership[]
+  presets                Preset[]
+  briefs                 ContentBrief[]
+  generationRuns         GenerationRun[]
+  structuredOutputs      StructuredOutput[]
+  usageEvents            UsageEvent[]
+  integrationConnections IntegrationConnection[]
+}
+
+model WorkspaceMembership {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Preset {
+  id                 String          @id @default(cuid())
+  name               String
+  slug               String
+  description        String
+  category           String
+  systemInstructions String
+  presetInstructions String
+  recommendedThemes  String[]
+  recommendedGoals   String[]
+  recommendedCtas    String[]
+  recommendedPlatforms String[]
+  defaultCadence     String
+  isSystem           Boolean         @default(true)
+  workspaceId        String?
+  createdById        String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  workspace          Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy          User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  briefs             ContentBrief[]
+  generationRuns     GenerationRun[]
+
+  @@unique([workspaceId, slug])
+  @@unique([isSystem, slug])
+}
+
+model ContentBrief {
+  id                String          @id @default(cuid())
+  workspaceId       String
+  authorId          String
+  presetId          String?
+  title             String
+  status            BriefStatus     @default(DRAFT)
+  businessName      String
+  niche             String
+  offer             String
+  audience          String
+  brandVoice        String
+  themes            String[]
+  platforms         String[]
+  cadence           String
+  goals             String[]
+  ctas              String[]
+  promotions        String[]
+  notes             String?
+  briefSnapshot     Json
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author            User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  preset            Preset?         @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  generationRuns    GenerationRun[]
+
+  @@index([workspaceId, updatedAt(sort: Desc)])
+}
+
+model GenerationRun {
+  id                String           @id @default(cuid())
+  workspaceId       String
+  briefId           String
+  presetId          String?
+  initiatedById     String
+  status            RunStatus        @default(QUEUED)
+  model             String
+  schemaVersion     Int              @default(1)
+  errorMessage      String?
+  promptVersion     String           @default("phase1-v1")
+  outputId          String?          @unique
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  completedAt       DateTime?
+  workspace         Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brief             ContentBrief     @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  preset            Preset?          @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  initiatedBy       User             @relation(fields: [initiatedById], references: [id], onDelete: Cascade)
+  structuredOutput  StructuredOutput?
+}
+
+model StructuredOutput {
+  id                String         @id @default(cuid())
+  workspaceId       String
+  runId             String         @unique
+  schemaVersion     Int            @default(1)
+  campaignSummary   String
+  calendarEntries   Json
+  captions          Json
+  hashtags          Json
+  imagePrompts      Json
+  rawOutput         Json
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  workspace         Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run               GenerationRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model UsageEvent {
+  id          String         @id @default(cuid())
+  workspaceId String?
+  userId      String?
+  type        UsageEventType
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model IntegrationConnection {
+  id                    String             @id @default(cuid())
+  workspaceId           String
+  userId                String
+  provider              IntegrationProvider
+  status                IntegrationStatus  @default(NOT_CONNECTED)
+  encryptedAccessToken  String?
+  encryptedRefreshToken String?
+  expiresAt             DateTime?
+  metadata              Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  workspace             Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model SecurityEvent {
+  id          String            @id @default(cuid())
+  type        SecurityEventType
+  subjectHash String
+  userId      String?
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  user        User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([type, subjectHash, createdAt(sort: Desc)])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

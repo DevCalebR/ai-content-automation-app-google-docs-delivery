@@ -1,0 +1,413 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
+import { requireSession } from "@/lib/auth/session";
+import { logError } from "@/lib/logger";
+import { workspaceSchema } from "@/lib/validations/workspace";
+import {
+  briefFormSchema,
+  buildBriefFormValues,
+  getBriefFieldErrors,
+  mapBriefParsedData,
+  runRequestSchema,
+  type SaveBriefState,
+} from "@/lib/validations/brief";
+import { assertRateLimitReady } from "@/lib/rate-limit";
+import { generateCampaignPlan } from "@/lib/ai/generate";
+import type { ActionState } from "@/components/ui/form-state";
+import {
+  createWorkspaceWithOwner,
+  getWorkspaceAccessForUser,
+  getWorkspaceAuthorizationForUser,
+} from "@/lib/workspaces/service";
+
+const idleState: ActionState = {
+  status: "idle",
+};
+
+export async function createWorkspaceAction(
+  prevState: ActionState = idleState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  const session = await requireSession();
+  const parsed = workspaceSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Enter a workspace name.",
+    };
+  }
+
+  const workspace = await createWorkspaceWithOwner({
+    ownerId: session.user.id,
+    name: parsed.data.name,
+    description: parsed.data.description || undefined,
+  });
+
+  redirect(`/app/workspaces/${workspace.id}`);
+}
+
+export async function saveBriefAction(
+  prevState: SaveBriefState,
+  formData: FormData,
+): Promise<SaveBriefState> {
+  const session = await requireSession();
+  const submittedValues = buildBriefFormValues({
+    workspaceId: formData.get("workspaceId"),
+    briefId: formData.get("briefId"),
+    presetId: formData.get("presetId"),
+    businessName: formData.get("businessName"),
+    niche: formData.get("niche"),
+    offer: formData.get("offer"),
+    audience: formData.get("audience"),
+    brandVoice: formData.get("brandVoice"),
+    themes: formData.get("themes"),
+    platforms: formData.get("platforms"),
+    cadence: formData.get("cadence"),
+    goals: formData.get("goals"),
+    ctas: formData.get("ctas"),
+    promotions: formData.get("promotions"),
+    notes: formData.get("notes"),
+  });
+  const submissionId = prevState.submissionId + 1;
+
+  const parsed = briefFormSchema.safeParse(submittedValues);
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Please correct the highlighted fields.",
+      values: submittedValues,
+      fieldErrors: getBriefFieldErrors(parsed.error),
+      submissionId,
+    };
+  }
+
+  const workspace = await getWorkspaceAccessForUser(parsed.data.workspaceId, session.user.id);
+
+  if (!workspace) {
+    return {
+      status: "error",
+      message: "Workspace not found.",
+      values: submittedValues,
+      fieldErrors: {},
+      submissionId,
+    };
+  }
+
+  const briefValues = mapBriefParsedData(parsed.data);
+  let savedBriefId = parsed.data.briefId;
+
+  if (parsed.data.briefId) {
+    const existingBrief = await db.contentBrief.findFirst({
+      where: {
+        id: parsed.data.briefId,
+        workspaceId: workspace.id,
+      },
+    });
+
+    if (!existingBrief) {
+      return {
+        status: "error",
+        message: "Brief not found for this workspace.",
+        values: submittedValues,
+        fieldErrors: {},
+        submissionId,
+      };
+    }
+
+    await db.contentBrief.update({
+      where: { id: existingBrief.id },
+      data: {
+        ...briefValues,
+        status: "READY",
+        briefSnapshot: briefValues,
+      },
+    });
+
+    savedBriefId = existingBrief.id;
+  } else {
+    const createdBrief = await db.contentBrief.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: session.user.id,
+        status: "READY",
+        ...briefValues,
+        briefSnapshot: briefValues,
+      },
+    });
+
+    savedBriefId = createdBrief.id;
+  }
+
+  await db.usageEvent.create({
+    data: {
+      userId: session.user.id,
+      workspaceId: workspace.id,
+      type: "BRIEF_SAVED",
+    },
+  });
+
+  revalidatePath(`/app/workspaces/${workspace.id}`);
+  revalidatePath(`/app/workspaces/${workspace.id}/generate`);
+
+  return {
+    status: "success",
+    message: "Brief saved to the workspace.",
+    values: {
+      ...submittedValues,
+      briefId: savedBriefId,
+    },
+    fieldErrors: {},
+    submissionId,
+  };
+}
+
+export async function duplicateBriefAction(formData: FormData) {
+  const session = await requireSession();
+  const briefId = String(formData.get("briefId") ?? "");
+
+  const brief = await db.contentBrief.findFirst({
+    where: {
+      id: briefId,
+      workspace: {
+        memberships: {
+          some: {
+            userId: session.user.id,
+          },
+        },
+      },
+    },
+  });
+
+  if (!brief) {
+    redirect("/app");
+  }
+
+  await db.contentBrief.create({
+    data: {
+      workspaceId: brief.workspaceId,
+      authorId: session.user.id,
+      presetId: brief.presetId,
+      title: `${brief.businessName} monthly content brief`,
+      status: "READY",
+      businessName: brief.businessName,
+      niche: brief.niche,
+      offer: brief.offer,
+      audience: brief.audience,
+      brandVoice: brief.brandVoice,
+      themes: brief.themes,
+      platforms: brief.platforms,
+      cadence: brief.cadence,
+      goals: brief.goals,
+      ctas: brief.ctas,
+      promotions: brief.promotions,
+      notes: brief.notes,
+      briefSnapshot: (brief.briefSnapshot ?? {}) as Prisma.InputJsonValue,
+    },
+  });
+
+  await db.usageEvent.create({
+    data: {
+      userId: session.user.id,
+      workspaceId: brief.workspaceId,
+      type: "BRIEF_DUPLICATED",
+    },
+  });
+
+  revalidatePath(`/app/workspaces/${brief.workspaceId}`);
+  redirect(`/app/workspaces/${brief.workspaceId}`);
+}
+
+export async function generateRunAction(formData: FormData) {
+  const session = await requireSession();
+  const parsed = runRequestSchema.safeParse({
+    workspaceId: formData.get("workspaceId"),
+    briefId: formData.get("briefId"),
+    presetId: formData.get("presetId"),
+  });
+
+  if (!parsed.success) {
+    redirect("/app");
+  }
+
+  const workspace = await getWorkspaceAccessForUser(parsed.data.workspaceId, session.user.id);
+
+  if (!workspace) {
+    redirect("/app");
+  }
+
+  const limiter = await assertRateLimitReady(`generate:${session.user.id}`);
+
+  if (!limiter.allowed) {
+    redirect(`/app/workspaces/${workspace.id}/generate?error=rate-limited`);
+  }
+
+  const brief = await db.contentBrief.findFirst({
+    where: {
+      id: parsed.data.briefId,
+      workspaceId: workspace.id,
+    },
+  });
+
+  if (!brief) {
+    redirect(`/app/workspaces/${workspace.id}/generate?error=brief-missing`);
+  }
+
+  const preset = parsed.data.presetId
+    ? await db.preset.findFirst({
+        where: {
+          id: parsed.data.presetId,
+          OR: [{ isSystem: true }, { workspaceId: workspace.id }],
+        },
+      })
+    : brief.presetId
+      ? await db.preset.findUnique({
+          where: { id: brief.presetId },
+        })
+      : null;
+
+  const run = await db.generationRun.create({
+    data: {
+      workspaceId: workspace.id,
+      briefId: brief.id,
+      presetId: preset?.id,
+      initiatedById: session.user.id,
+      status: "RUNNING",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.4-mini",
+    },
+  });
+
+  await db.usageEvent.create({
+    data: {
+      userId: session.user.id,
+      workspaceId: workspace.id,
+      type: "GENERATION_REQUESTED",
+      metadata: {
+        runId: run.id,
+      },
+    },
+  });
+
+  try {
+    const output = await generateCampaignPlan({
+      brief,
+      preset,
+    });
+
+    const structuredOutput = await db.structuredOutput.create({
+      data: {
+        workspaceId: workspace.id,
+        runId: run.id,
+        campaignSummary: output.campaignSummary,
+        calendarEntries: output.calendarEntries,
+        captions: output.sampleCaptions,
+        hashtags: output.hashtags,
+        imagePrompts: output.imagePrompts,
+        rawOutput: output,
+      },
+    });
+
+    await db.generationRun.update({
+      where: { id: run.id },
+      data: {
+        status: "SUCCEEDED",
+        completedAt: new Date(),
+        outputId: structuredOutput.id,
+      },
+    });
+
+    await db.usageEvent.create({
+      data: {
+        userId: session.user.id,
+        workspaceId: workspace.id,
+        type: "GENERATION_COMPLETED",
+        metadata: {
+          runId: run.id,
+        },
+      },
+    });
+
+    revalidatePath(`/app/workspaces/${workspace.id}`);
+    revalidatePath(`/app/workspaces/${workspace.id}/history`);
+    redirect(`/app/workspaces/${workspace.id}/results/${run.id}`);
+  } catch (error) {
+    logError(error, "generation");
+
+    await db.generationRun.update({
+      where: { id: run.id },
+      data: {
+        status: "FAILED",
+        errorMessage: error instanceof Error ? error.message : "Generation failed.",
+        completedAt: new Date(),
+      },
+    });
+
+    await db.usageEvent.create({
+      data: {
+        userId: session.user.id,
+        workspaceId: workspace.id,
+        type: "GENERATION_FAILED",
+        metadata: {
+          runId: run.id,
+        },
+      },
+    });
+
+    redirect(`/app/workspaces/${workspace.id}/results/${run.id}`);
+  }
+}
+
+export async function updateWorkspaceSettingsAction(
+  prevState: ActionState = idleState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prevState;
+  const session = await requireSession();
+  const workspaceId = String(formData.get("workspaceId") ?? "");
+
+  const parsed = workspaceSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Enter valid workspace details.",
+    };
+  }
+
+  const authorization = await getWorkspaceAuthorizationForUser(workspaceId, session.user.id);
+
+  if (!authorization || !authorization.isOwner) {
+    return {
+      status: "error",
+      message: "Only workspace owners can update settings.",
+    };
+  }
+
+  await db.workspace.update({
+    where: { id: authorization.workspace.id },
+    data: {
+      name: parsed.data.name,
+      description: parsed.data.description || undefined,
+    },
+  });
+
+  revalidatePath(`/app/workspaces/${authorization.workspace.id}/settings`);
+  revalidatePath(`/app/workspaces/${authorization.workspace.id}`);
+
+  return {
+    status: "success",
+    message: "Workspace settings updated.",
+  };
+}
