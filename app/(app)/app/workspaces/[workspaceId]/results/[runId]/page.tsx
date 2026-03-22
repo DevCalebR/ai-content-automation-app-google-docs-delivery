@@ -38,9 +38,9 @@ export default async function ResultsPage({ params }: PageProps) {
               {run.brief.businessName}
             </h1>
             <p className="mt-3 text-base leading-8 text-[var(--ink-soft)]">
-              Generated {formatShortDate(run.createdAt)} with {run.model}. This Phase 1 view
-              renders the normalized structured output and leaves clear extension points for
-              carousels, scripts, export flows, and Google Docs delivery.
+              Generated {formatShortDate(run.createdAt)} with {run.model}. Review the
+              campaign summary, calendar, captions, hashtags, and image prompts for this
+              run in one place.
             </p>
           </div>
           <Badge>{run.status}</Badge>
