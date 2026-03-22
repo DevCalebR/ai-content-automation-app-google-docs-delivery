@@ -10,6 +10,7 @@ import { getWorkspaceForUser } from "@/lib/data/workspaces";
 import { getBriefForWorkspace, getBriefsForWorkspace } from "@/lib/data/briefs";
 import { getPresetOptions } from "@/lib/data/presets";
 import { formatShortDate } from "@/lib/utils";
+import { getWorkspaceAuthorizationForUser } from "@/lib/workspaces/service";
 
 type PageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -20,9 +21,12 @@ export default async function WorkspacePage({ params, searchParams }: PageProps)
   const session = await requireSession();
   const { workspaceId } = await params;
   const { briefId } = await searchParams;
-  const workspace = await getWorkspaceForUser(workspaceId, session.user.id);
+  const [workspace, authorization] = await Promise.all([
+    getWorkspaceForUser(workspaceId, session.user.id),
+    getWorkspaceAuthorizationForUser(workspaceId, session.user.id),
+  ]);
 
-  if (!workspace) {
+  if (!workspace || !authorization) {
     notFound();
   }
 
@@ -47,7 +51,7 @@ export default async function WorkspacePage({ params, searchParams }: PageProps)
           <div className="mt-6 flex flex-wrap gap-2">
             <Badge>{workspace._count.briefs} briefs</Badge>
             <Badge>{workspace._count.generationRuns} runs</Badge>
-            <Badge>Owner-managed</Badge>
+            <Badge>{authorization.isOwner ? "Owner access" : "Member access"}</Badge>
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href={`/app/workspaces/${workspace.id}/generate`}>
@@ -56,6 +60,23 @@ export default async function WorkspacePage({ params, searchParams }: PageProps)
             <Link href={`/app/workspaces/${workspace.id}/history`}>
               <Button variant="secondary">View history</Button>
             </Link>
+            <Link href={`/app/workspaces/${workspace.id}/settings`}>
+              <Button variant="secondary">
+                {authorization.isOwner ? "Manage settings" : "View settings"}
+              </Button>
+            </Link>
+          </div>
+          <div className="mt-4 rounded-[1.5rem] border border-[var(--line)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]">
+            <p className="font-medium text-[var(--ink)]">
+              {authorization.isOwner
+                ? "Google Docs delivery and workspace configuration live in settings."
+                : "Settings show the shared Google Docs delivery setup for this workspace."}
+            </p>
+            <p className="mt-2 leading-7">
+              {authorization.isOwner
+                ? "Use settings to connect the shared Google Drive folder, update workspace details, and control delivery for completed runs."
+                : "Only workspace owners can change settings, but you can still review the current delivery setup, create briefs, and run generations."}
+            </p>
           </div>
         </Panel>
         <Panel className="p-7">
