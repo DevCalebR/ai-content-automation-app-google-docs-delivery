@@ -14,7 +14,7 @@ Phase 1 delivers the production foundation for a SaaS content automation platfor
 
 ## Why this auth choice
 
-Phase 1 uses `next-auth` credentials auth with Prisma-backed sessions because it is production-capable, works cleanly with App Router, keeps identity data in the same durable database model as the rest of the product, and leaves room for OAuth providers later without forcing a redesign of users, sessions, or workspace ownership.
+Phase 1 uses `next-auth` credentials auth with the Prisma adapter and JWT-backed sessions because it is production-capable, works cleanly with App Router, keeps identity data in the same durable database model as the rest of the product, and avoids the credentials-provider restriction on database session strategy.
 
 The sign-up flow is intentionally secure: after registration, the server redirects the user to `/sign-in` with a success state. The raw password is never returned from the server to the client. Phase 2 adds email verification, password reset, and database-backed auth rate limiting.
 

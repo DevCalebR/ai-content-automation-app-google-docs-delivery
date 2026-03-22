@@ -31,7 +31,7 @@ Phase 1 establishes a production-first SaaS foundation for structured content pl
 
 - `next-auth` credentials provider
 - Prisma adapter
-- database session strategy
+- JWT session strategy
 - protected app layout via server-side session enforcement
 - sign-up redirects to sign-in with a success state instead of returning credentials
 - credentials sign-in requires verified email

@@ -40,7 +40,7 @@ export default async function SignInPage({ searchParams }: PageProps) {
           </p>
           <div className="mt-10 flex flex-wrap gap-3 text-sm text-[var(--ink-soft)]">
             <span className="rounded-full border border-[var(--line)] px-4 py-2">Protected app routes</span>
-            <span className="rounded-full border border-[var(--line)] px-4 py-2">Database sessions</span>
+            <span className="rounded-full border border-[var(--line)] px-4 py-2">JWT session auth</span>
             <span className="rounded-full border border-[var(--line)] px-4 py-2">Workspace-aware onboarding</span>
           </div>
           <Link className="mt-10 inline-block text-sm font-medium text-[var(--ink)]" href="/">
