@@ -285,6 +285,7 @@ export async function generateRunAction(formData: FormData) {
       model: process.env.OPENAI_MODEL ?? "gpt-5.4-mini",
     },
   });
+  const resultsPath = `/app/workspaces/${workspace.id}/results/${run.id}`;
 
   await db.usageEvent.create({
     data: {
@@ -338,7 +339,6 @@ export async function generateRunAction(formData: FormData) {
 
     revalidatePath(`/app/workspaces/${workspace.id}`);
     revalidatePath(`/app/workspaces/${workspace.id}/history`);
-    redirect(`/app/workspaces/${workspace.id}/results/${run.id}`);
   } catch (error) {
     logError(error, "generation");
 
@@ -361,9 +361,9 @@ export async function generateRunAction(formData: FormData) {
         },
       },
     });
-
-    redirect(`/app/workspaces/${workspace.id}/results/${run.id}`);
   }
+
+  redirect(resultsPath);
 }
 
 export async function updateWorkspaceSettingsAction(
