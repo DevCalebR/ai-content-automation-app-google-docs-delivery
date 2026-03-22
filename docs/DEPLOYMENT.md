@@ -5,6 +5,7 @@
 - Vercel for the Next.js application
 - Managed PostgreSQL for production
 - Server-side environment variables for auth and OpenAI secrets
+- A Google Cloud service account for Google Docs delivery
 
 ## Required environment variables
 
@@ -22,6 +23,8 @@ SMTP_PORT=587
 SMTP_USER=
 SMTP_PASSWORD=
 SMTP_SECURE=false
+GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY=
 NODE_ENV=production
 ```
 
@@ -36,7 +39,9 @@ npm run db:migrate:deploy
 ```
 
 4. Build and deploy the Next.js application.
-5. Verify sign-up, sign-in, workspace creation, brief save, generation, and results rendering.
+5. Share a Google Drive folder with the service account email.
+6. Save that folder ID in the workspace settings page.
+7. Verify sign-up, sign-in, workspace creation, brief save, generation, exports, and Google Docs delivery.
 
 ## Notes
 
@@ -44,4 +49,5 @@ npm run db:migrate:deploy
 - Keep `NEXTAUTH_SECRET` unique per environment.
 - Use `DIRECT_DATABASE_URL` for Prisma migrations where the provider requires a direct connection.
 - Configure transactional email before enabling production sign-up, verification, and password reset flows.
-- Google Docs delivery is not implemented in Phase 1; only the durable integration record exists.
+- The current Google Docs flow is workspace-managed through a shared folder plus server-side service-account credentials.
+- Store the Google service account private key as a multiline secret and preserve newlines when your deploy platform requires escaping.

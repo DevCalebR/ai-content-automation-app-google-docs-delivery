@@ -7,6 +7,11 @@ export async function getRunsForWorkspace(workspaceId: string) {
       brief: true,
       preset: true,
       structuredOutput: true,
+      deliveries: {
+        orderBy: {
+          updatedAt: "desc",
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -22,6 +27,11 @@ export async function getRunForWorkspace(runId: string, workspaceId: string) {
       brief: true,
       preset: true,
       structuredOutput: true,
+      deliveries: {
+        orderBy: {
+          updatedAt: "desc",
+        },
+      },
     },
   });
 }

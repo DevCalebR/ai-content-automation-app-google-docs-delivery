@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
-import { logError } from "@/lib/logger";
+import { logAuditEvent, logError } from "@/lib/logger";
 import { workspaceSchema } from "@/lib/validations/workspace";
 import {
   briefFormSchema,
@@ -18,6 +18,20 @@ import {
 import { assertRateLimitReady } from "@/lib/rate-limit";
 import { generateCampaignPlan } from "@/lib/ai/generate";
 import type { ActionState } from "@/components/ui/form-state";
+import {
+  buildGoogleDocsDocumentTitle,
+  getGoogleDocsConnectionMetadata,
+} from "@/lib/google-docs/connection";
+import {
+  initialGoogleDocsDeliveryState,
+  initialGoogleDocsSettingsState,
+  type GoogleDocsDeliveryState,
+  type GoogleDocsSettingsState,
+} from "@/lib/google-docs/state";
+import {
+  googleDocsConnectionFormSchema,
+  googleDocsDeliveryRequestSchema,
+} from "@/lib/validations/google-docs";
 import {
   createWorkspaceWithOwner,
   getWorkspaceAccessForUser,
@@ -410,4 +424,339 @@ export async function updateWorkspaceSettingsAction(
     status: "success",
     message: "Workspace settings updated.",
   };
+}
+
+export async function saveGoogleDocsConnectionAction(
+  prevState: GoogleDocsSettingsState = initialGoogleDocsSettingsState,
+  formData: FormData,
+): Promise<GoogleDocsSettingsState> {
+  void prevState;
+  const session = await requireSession();
+  const submittedValues = {
+    folderId: String(formData.get("folderId") ?? "").trim(),
+    titlePrefix: String(formData.get("titlePrefix") ?? "").trim(),
+  };
+  const parsed = googleDocsConnectionFormSchema.safeParse({
+    workspaceId: formData.get("workspaceId"),
+    folderId: submittedValues.folderId,
+    titlePrefix: submittedValues.titlePrefix,
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Enter a valid Google Drive folder ID.",
+      values: submittedValues,
+    };
+  }
+
+  const authorization = await getWorkspaceAuthorizationForUser(
+    parsed.data.workspaceId,
+    session.user.id,
+  );
+
+  if (!authorization || !authorization.isOwner) {
+    return {
+      status: "error",
+      message: "Only workspace owners can update Google Docs delivery settings.",
+      values: submittedValues,
+    };
+  }
+
+  const { hasGoogleDocsServiceAccountConfig } = await import("@/lib/google-docs/client");
+
+  if (!hasGoogleDocsServiceAccountConfig()) {
+    return {
+      status: "error",
+      message:
+        "Google Docs delivery is not configured on the server yet. Add the service account credentials before connecting a workspace folder.",
+      values: submittedValues,
+    };
+  }
+
+  try {
+    const { validateGoogleDocsFolderAccess } = await import("@/lib/google-docs/service");
+    const folder = await validateGoogleDocsFolderAccess(parsed.data.folderId);
+    const metadata = {
+      folderId: folder.folderId,
+      folderName: folder.folderName,
+      titlePrefix: parsed.data.titlePrefix?.trim() || undefined,
+      configuredAt: new Date().toISOString(),
+    };
+
+    await db.integrationConnection.upsert({
+      where: {
+        workspaceId_provider: {
+          workspaceId: authorization.workspace.id,
+          provider: "GOOGLE_DOCS",
+        },
+      },
+      create: {
+        workspaceId: authorization.workspace.id,
+        userId: session.user.id,
+        provider: "GOOGLE_DOCS",
+        status: "CONNECTED",
+        metadata,
+      },
+      update: {
+        userId: session.user.id,
+        status: "CONNECTED",
+        metadata,
+      },
+    });
+
+    logAuditEvent({
+      action: "google_docs.connection.save",
+      userId: session.user.id,
+      workspaceId: authorization.workspace.id,
+      metadata: {
+        folderId: folder.folderId,
+        folderName: folder.folderName,
+      },
+    });
+
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/settings`);
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/history`);
+
+    return {
+      status: "success",
+      message: `Google Docs delivery is connected to ${folder.folderName}.`,
+      values: {
+        folderId: folder.folderId,
+        titlePrefix: parsed.data.titlePrefix?.trim() || "",
+      },
+    };
+  } catch (error) {
+    logError(error, "google-docs.connection");
+
+    await db.integrationConnection.upsert({
+      where: {
+        workspaceId_provider: {
+          workspaceId: authorization.workspace.id,
+          provider: "GOOGLE_DOCS",
+        },
+      },
+      create: {
+        workspaceId: authorization.workspace.id,
+        userId: session.user.id,
+        provider: "GOOGLE_DOCS",
+        status: "ERROR",
+        metadata: {
+          folderId: parsed.data.folderId,
+          titlePrefix: parsed.data.titlePrefix?.trim() || undefined,
+          configuredAt: new Date().toISOString(),
+        },
+      },
+      update: {
+        userId: session.user.id,
+        status: "ERROR",
+        metadata: {
+          folderId: parsed.data.folderId,
+          titlePrefix: parsed.data.titlePrefix?.trim() || undefined,
+          configuredAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "We couldn’t validate access to that Google Drive folder.",
+      values: submittedValues,
+    };
+  }
+}
+
+export async function deliverRunToGoogleDocsAction(
+  prevState: GoogleDocsDeliveryState = initialGoogleDocsDeliveryState,
+  formData: FormData,
+): Promise<GoogleDocsDeliveryState> {
+  void prevState;
+  const session = await requireSession();
+  const parsed = googleDocsDeliveryRequestSchema.safeParse({
+    workspaceId: formData.get("workspaceId"),
+    runId: formData.get("runId"),
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "We couldn’t start Google Docs delivery for this run.",
+    };
+  }
+
+  const authorization = await getWorkspaceAuthorizationForUser(
+    parsed.data.workspaceId,
+    session.user.id,
+  );
+
+  if (!authorization || !authorization.isOwner) {
+    return {
+      status: "error",
+      message: "Only workspace owners can deliver results to Google Docs.",
+    };
+  }
+
+  const run = await db.generationRun.findFirst({
+    where: {
+      id: parsed.data.runId,
+      workspaceId: authorization.workspace.id,
+    },
+    include: {
+      brief: true,
+      structuredOutput: true,
+    },
+  });
+
+  if (!run || !run.structuredOutput) {
+    return {
+      status: "error",
+      message: "This run does not have a completed result to deliver yet.",
+    };
+  }
+
+  const connection = await db.integrationConnection.findFirst({
+    where: {
+      workspaceId: authorization.workspace.id,
+      provider: "GOOGLE_DOCS",
+    },
+  });
+  const connectionMetadata = getGoogleDocsConnectionMetadata(connection);
+
+  if (!connectionMetadata) {
+    return {
+      status: "error",
+      message: "Connect Google Docs delivery in workspace settings before delivering a run.",
+    };
+  }
+
+  const deliveryTitle = buildGoogleDocsDocumentTitle({
+    businessName: run.brief.businessName,
+    createdAt: run.createdAt,
+    titlePrefix: connectionMetadata.titlePrefix,
+  });
+
+  await db.runDelivery.upsert({
+    where: {
+      runId_provider: {
+        runId: run.id,
+        provider: "GOOGLE_DOCS",
+      },
+    },
+    create: {
+      runId: run.id,
+      workspaceId: authorization.workspace.id,
+      initiatedById: session.user.id,
+      provider: "GOOGLE_DOCS",
+      status: "PENDING",
+      title: deliveryTitle,
+      metadata: connectionMetadata as Prisma.InputJsonValue,
+    },
+    update: {
+      initiatedById: session.user.id,
+      status: "PENDING",
+      title: deliveryTitle,
+      errorMessage: null,
+      metadata: connectionMetadata as Prisma.InputJsonValue,
+    },
+  });
+
+  try {
+    const { deliverStructuredOutputToGoogleDocs } = await import("@/lib/google-docs/delivery");
+    const deliveredDocument = await deliverStructuredOutputToGoogleDocs({
+      businessName: run.brief.businessName,
+      createdAt: run.createdAt,
+      model: run.model,
+      output: run.structuredOutput,
+      connectionMetadata,
+    });
+
+    await db.runDelivery.update({
+      where: {
+        runId_provider: {
+          runId: run.id,
+          provider: "GOOGLE_DOCS",
+        },
+      },
+      data: {
+        status: "DELIVERED",
+        title: deliveredDocument.title,
+        externalId: deliveredDocument.documentId,
+        externalUrl: deliveredDocument.url,
+        errorMessage: null,
+        deliveredAt: new Date(),
+      },
+    });
+
+    await db.usageEvent.create({
+      data: {
+        userId: session.user.id,
+        workspaceId: authorization.workspace.id,
+        type: "RUN_DELIVERED",
+        metadata: {
+          runId: run.id,
+          provider: "GOOGLE_DOCS",
+          documentId: deliveredDocument.documentId,
+        },
+      },
+    });
+
+    logAuditEvent({
+      action: "google_docs.delivery.succeeded",
+      userId: session.user.id,
+      workspaceId: authorization.workspace.id,
+      metadata: {
+        runId: run.id,
+        documentId: deliveredDocument.documentId,
+      },
+    });
+
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/results/${run.id}`);
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/history`);
+
+    return {
+      status: "success",
+      message: "Run delivered to Google Docs.",
+      documentUrl: deliveredDocument.url,
+    };
+  } catch (error) {
+    logError(error, "google-docs.delivery");
+
+    await db.runDelivery.update({
+      where: {
+        runId_provider: {
+          runId: run.id,
+          provider: "GOOGLE_DOCS",
+        },
+      },
+      data: {
+        status: "FAILED",
+        errorMessage:
+          error instanceof Error ? error.message : "Google Docs delivery failed.",
+      },
+    });
+
+    await db.usageEvent.create({
+      data: {
+        userId: session.user.id,
+        workspaceId: authorization.workspace.id,
+        type: "RUN_DELIVERY_FAILED",
+        metadata: {
+          runId: run.id,
+          provider: "GOOGLE_DOCS",
+        },
+      },
+    });
+
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/results/${run.id}`);
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/history`);
+
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "Google Docs delivery failed.",
+    };
+  }
 }

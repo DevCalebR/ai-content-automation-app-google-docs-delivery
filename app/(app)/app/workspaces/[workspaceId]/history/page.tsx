@@ -21,6 +21,10 @@ export default async function HistoryPage({ params }: PageProps) {
   }
 
   const runs = await getRunsForWorkspace(workspace.id);
+  const runsByBrief = runs.reduce<Record<string, number>>((counts, run) => {
+    counts[run.briefId] = (counts[run.briefId] ?? 0) + 1;
+    return counts;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -37,26 +41,63 @@ export default async function HistoryPage({ params }: PageProps) {
       <Panel className="p-7">
         <div className="space-y-3">
           {runs.length ? (
-            runs.map((run) => (
-              <Link
-                key={run.id}
-                href={`/app/workspaces/${workspace.id}/results/${run.id}`}
-                className="block rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5 transition hover:bg-white"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-[var(--ink)]">{run.brief.businessName}</p>
-                    <p className="mt-1 text-sm text-[var(--ink-soft)]">
-                      {run.preset?.name ?? "Brief preset"} · {run.model}
-                    </p>
+            runs.map((run) => {
+              const googleDocsDelivery = run.deliveries.find(
+                (delivery) => delivery.provider === "GOOGLE_DOCS",
+              );
+
+              return (
+                <div
+                  key={run.id}
+                  className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-[var(--ink)]">{run.brief.businessName}</p>
+                      <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                        {run.preset?.name ?? "Brief preset"} · {run.model}
+                      </p>
+                      <p className="mt-3 text-sm text-[var(--ink-soft)]">
+                        Created {formatShortDate(run.createdAt)}
+                        {run.completedAt ? ` · Completed ${formatShortDate(run.completedAt)}` : ""}
+                      </p>
+                      <p className="mt-2 text-sm text-[var(--ink-soft)]">
+                        {runsByBrief[run.briefId]} run
+                        {runsByBrief[run.briefId] === 1 ? "" : "s"} from this brief.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge>{run.status}</Badge>
+                      {run.structuredOutput ? <Badge>EXPORT_READY</Badge> : null}
+                      {googleDocsDelivery ? <Badge>{googleDocsDelivery.status}</Badge> : null}
+                    </div>
                   </div>
-                  <Badge>{run.status}</Badge>
+                  {run.structuredOutput?.campaignSummary ? (
+                    <p className="mt-4 line-clamp-2 text-sm leading-7 text-[var(--ink-soft)]">
+                      {run.structuredOutput.campaignSummary}
+                    </p>
+                  ) : null}
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Link href={`/app/workspaces/${workspace.id}/results/${run.id}`}>
+                      <span className="text-sm font-medium text-[var(--ink)]">Open results</span>
+                    </Link>
+                    <Link href={`/app/workspaces/${workspace.id}/generate?briefId=${run.briefId}`}>
+                      <span className="text-sm font-medium text-[var(--ink)]">Generate again</span>
+                    </Link>
+                    {googleDocsDelivery?.externalUrl ? (
+                      <a
+                        className="text-sm font-medium text-[var(--ink)]"
+                        href={googleDocsDelivery.externalUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        Open delivered doc
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="mt-3 text-sm text-[var(--ink-soft)]">
-                  Created {formatShortDate(run.createdAt)}
-                </p>
-              </Link>
-            ))
+              );
+            })
           ) : (
             <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
               No runs have been recorded for this workspace yet.
