@@ -7,7 +7,14 @@ import { db } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { logError } from "@/lib/logger";
 import { workspaceSchema } from "@/lib/validations/workspace";
-import { briefFormSchema, mapBriefParsedData, runRequestSchema } from "@/lib/validations/brief";
+import {
+  briefFormSchema,
+  buildBriefFormValues,
+  getBriefFieldErrors,
+  mapBriefParsedData,
+  runRequestSchema,
+  type SaveBriefState,
+} from "@/lib/validations/brief";
 import { assertRateLimitReady } from "@/lib/rate-limit";
 import { generateCampaignPlan } from "@/lib/ai/generate";
 import type { ActionState } from "@/components/ui/form-state";
@@ -49,13 +56,11 @@ export async function createWorkspaceAction(
 }
 
 export async function saveBriefAction(
-  prevState: ActionState = idleState,
+  prevState: SaveBriefState,
   formData: FormData,
-): Promise<ActionState> {
-  void prevState;
+): Promise<SaveBriefState> {
   const session = await requireSession();
-
-  const parsed = briefFormSchema.safeParse({
+  const submittedValues = buildBriefFormValues({
     workspaceId: formData.get("workspaceId"),
     briefId: formData.get("briefId"),
     presetId: formData.get("presetId"),
@@ -72,11 +77,17 @@ export async function saveBriefAction(
     promotions: formData.get("promotions"),
     notes: formData.get("notes"),
   });
+  const submissionId = prevState.submissionId + 1;
+
+  const parsed = briefFormSchema.safeParse(submittedValues);
 
   if (!parsed.success) {
     return {
       status: "error",
-      message: parsed.error.issues[0]?.message ?? "Enter a valid structured brief.",
+      message: "Please correct the highlighted fields.",
+      values: submittedValues,
+      fieldErrors: getBriefFieldErrors(parsed.error),
+      submissionId,
     };
   }
 
@@ -86,10 +97,14 @@ export async function saveBriefAction(
     return {
       status: "error",
       message: "Workspace not found.",
+      values: submittedValues,
+      fieldErrors: {},
+      submissionId,
     };
   }
 
-  const values = mapBriefParsedData(parsed.data);
+  const briefValues = mapBriefParsedData(parsed.data);
+  let savedBriefId = parsed.data.briefId;
 
   if (parsed.data.briefId) {
     const existingBrief = await db.contentBrief.findFirst({
@@ -103,27 +118,34 @@ export async function saveBriefAction(
       return {
         status: "error",
         message: "Brief not found for this workspace.",
+        values: submittedValues,
+        fieldErrors: {},
+        submissionId,
       };
     }
 
     await db.contentBrief.update({
       where: { id: existingBrief.id },
       data: {
-        ...values,
+        ...briefValues,
         status: "READY",
-        briefSnapshot: values,
+        briefSnapshot: briefValues,
       },
     });
+
+    savedBriefId = existingBrief.id;
   } else {
-    await db.contentBrief.create({
+    const createdBrief = await db.contentBrief.create({
       data: {
         workspaceId: workspace.id,
         authorId: session.user.id,
         status: "READY",
-        ...values,
-        briefSnapshot: values,
+        ...briefValues,
+        briefSnapshot: briefValues,
       },
     });
+
+    savedBriefId = createdBrief.id;
   }
 
   await db.usageEvent.create({
@@ -140,6 +162,12 @@ export async function saveBriefAction(
   return {
     status: "success",
     message: "Brief saved to the workspace.",
+    values: {
+      ...submittedValues,
+      briefId: savedBriefId,
+    },
+    fieldErrors: {},
+    submissionId,
   };
 }
 
