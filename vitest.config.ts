@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: "node",
+    fileParallelism: false,
     globals: true,
-    setupFiles: ["dotenv/config"],
+    setupFiles: ["dotenv/config", "./tests/setup-env.ts"],
   },
 });
