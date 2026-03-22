@@ -26,7 +26,7 @@ export default async function MarketingPage() {
             <p className="text-sm font-medium text-[var(--ink)]">
               AI Content Automation App with Google Docs Delivery
             </p>
-            <p className="text-xs text-[var(--ink-soft)]">Phase 1 production foundation</p>
+            <p className="text-xs text-[var(--ink-soft)]">Structured content operations</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -49,9 +49,9 @@ export default async function MarketingPage() {
                 Turn one disciplined brief into a durable monthly content engine.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--ink-soft)]">
-                This foundation is built for signed-in teams who need reusable presets,
-                durable brief storage, saved run history, and an OpenAI-ready generation
-                workflow that can grow into full Google Docs delivery.
+                Built for teams that need reusable presets, durable brief storage, saved
+                run history, and an OpenAI-powered workflow for producing organized monthly
+                content.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href={session ? "/app" : "/sign-up"}>
@@ -62,7 +62,7 @@ export default async function MarketingPage() {
                 </Link>
                 <Link href="#foundation">
                   <Button size="lg" variant="secondary">
-                    View Phase 1 scope
+                    View workflow
                   </Button>
                 </Link>
               </div>
@@ -91,7 +91,7 @@ export default async function MarketingPage() {
                 {[
                   "Workspace ownership and membership",
                   "Structured brief intake and versioned runs",
-                  "Results tabs ready for Docs export expansion",
+                  "Results tabs for organized review",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-3 rounded-[1.5rem] bg-white p-4">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 text-[var(--success)]" />

@@ -66,7 +66,7 @@ export default async function WorkspacePage({ params, searchParams }: PageProps)
             ))}
           </div>
           <p className="mt-6 text-sm leading-7 text-[var(--ink-soft)]">
-            Phase 1 includes reusable presets for Real Estate, Coach/Consultant,
+            Choose from reusable presets for Real Estate, Coach/Consultant,
             SaaS/Productized Service, E-commerce, Local Business, and Creator Brand.
           </p>
         </Panel>

@@ -32,14 +32,13 @@ export default async function DashboardPage() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <Panel className="p-7">
           <p className="section-heading">Dashboard</p>
-          <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
-            Manage briefs, launch runs, and review saved content structure.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-            Phase 1 focuses on the production foundation: auth, workspaces, presets,
-            structured brief intake, durable run history, and a clear OpenAI service
-            boundary for generation.
-          </p>
+        <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
+          Manage briefs, launch runs, and review saved content structure.
+        </h1>
+        <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
+          Keep each workspace organized with reusable presets, structured briefs, saved
+          runs, and a consistent OpenAI-powered generation workflow.
+        </p>
         </Panel>
         <Panel className="p-7">
           <p className="section-heading">At a glance</p>

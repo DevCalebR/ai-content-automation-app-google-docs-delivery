@@ -10,9 +10,8 @@ export default function OnboardingPage() {
           Create the first workspace before briefs and runs start compounding.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          A workspace owns presets, content briefs, generation history, and future
-          integration state. The model stays durable and simple: one explicit owner, clear
-          membership records, and extension points for collaboration later.
+          Each workspace keeps presets, briefs, generation history, and settings organized
+          around one brand, client, or business line.
         </p>
       </Panel>
       <Panel className="p-7">

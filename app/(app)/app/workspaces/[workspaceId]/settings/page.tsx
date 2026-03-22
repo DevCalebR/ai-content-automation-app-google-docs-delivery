@@ -33,11 +33,11 @@ export default async function SettingsPage({ params }: PageProps) {
       <Panel className="p-7">
         <p className="section-heading">Settings</p>
         <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
-          Workspace settings and integration readiness
+          Manage workspace settings
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Owners can manage workspace metadata and future integrations here. Members have
-          read-only visibility into the same workspace readiness context.
+          Owners can update workspace details here, while members have read-only visibility
+          into the current workspace setup.
         </p>
         <div className="mt-6">
           <Badge>{authorization.isOwner ? "OWNER" : authorization.membership.role}</Badge>
@@ -47,8 +47,8 @@ export default async function SettingsPage({ params }: PageProps) {
             <WorkspaceSettingsForm workspace={workspace} />
           ) : (
             <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
-              Only workspace owners can change settings or manage future integrations. You
-              can still create briefs, run generations, and review saved outputs.
+              Only workspace owners can change settings. You can still create briefs, run
+              generations, and review saved outputs.
             </div>
           )}
         </div>
@@ -60,9 +60,8 @@ export default async function SettingsPage({ params }: PageProps) {
           <Badge>{integration?.status ?? "NOT_CONNECTED"}</Badge>
         </div>
         <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
-          The workspace already has a durable `IntegrationConnection` model with secure token
-          fields and metadata support. Phase 2 will layer the actual OAuth handshake and
-          document export workflow onto this record.
+          This section tracks the workspace connection record for Google Docs delivery and
+          keeps its current status visible in one place.
         </p>
       </Panel>
     </div>

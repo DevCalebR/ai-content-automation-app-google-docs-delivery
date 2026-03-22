@@ -35,8 +35,8 @@ export default async function GeneratePage({ params, searchParams }: PageProps) 
           Launch a structured content plan from a saved brief.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Phase 1 runs a real server-side OpenAI flow using the Responses API, schema-backed
-          parsing, and durable storage for the normalized result.
+          Run a server-side OpenAI workflow that turns a saved brief into a structured
+          content plan you can review, refine, and reuse.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5">
@@ -47,10 +47,10 @@ export default async function GeneratePage({ params, searchParams }: PageProps) 
             </p>
           </div>
           <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5">
-            <p className="font-medium text-[var(--ink)]">Extension path</p>
+            <p className="font-medium text-[var(--ink)]">Reusable delivery format</p>
             <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-              Carousels, scripts, background jobs, exports, and Google Docs delivery can
-              layer onto the same generation run and output model in Phase 2.
+              Every run is saved in a consistent structure so your team can revisit the
+              output, compare iterations, and prepare it for delivery.
             </p>
           </div>
         </div>
@@ -58,8 +58,8 @@ export default async function GeneratePage({ params, searchParams }: PageProps) 
       <Panel className="p-7">
         <p className="text-2xl font-medium text-[var(--ink)]">Generate now</p>
         <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-          Choose a saved brief, optionally override the preset, and generate the first
-          structured plan.
+          Choose a saved brief, optionally override the preset, and generate a structured
+          content plan.
         </p>
         {error ? (
           <p className="mt-4 text-sm text-[var(--danger)]">
