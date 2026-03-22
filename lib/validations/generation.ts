@@ -31,4 +31,8 @@ export const generationOutputSchema = z.object({
   imagePrompts: z.array(imagePromptSchema).min(2).max(8),
 });
 
+export type CalendarEntry = z.infer<typeof calendarEntrySchema>;
+export type Caption = z.infer<typeof captionSchema>;
+export type HashtagSet = z.infer<typeof hashtagSetSchema>;
+export type ImagePrompt = z.infer<typeof imagePromptSchema>;
 export type GenerationOutput = z.infer<typeof generationOutputSchema>;

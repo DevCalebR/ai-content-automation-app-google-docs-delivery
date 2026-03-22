@@ -35,17 +35,26 @@
 ## Results and history
 
 - History page shows prior runs for the workspace.
+- History page shows run status, model, export readiness, and Google Docs delivery state where available.
 - Results page renders overview, calendar, captions, hashtags, and image prompts.
+- Each results section has a working copy action.
+- Copy all results copies a complete text version of the run.
+- Markdown and plain-text downloads return deterministic attachments for the saved run.
 - Reloading the results page still shows persisted data.
 
 ## Settings
 
 - Workspace settings can be updated by the owner.
 - Workspace members see read-only settings state and cannot perform owner-only mutations.
-- Integrations section shows durable Google Docs readiness state without dead action buttons.
+- Owners can save a shared Google Drive folder ID for Google Docs delivery.
+- Non-owners cannot change Google Docs delivery settings.
+- A successful delivery creates a Google Doc and shows the document link back in results and history.
+- A failed delivery records a failed state without removing prior saved run data.
 
 ## Final validation
 
+- `npm install`
 - `npm run lint`
 - `npm run typecheck`
+- `npm run test`
 - `npm run build`

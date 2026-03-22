@@ -35,6 +35,9 @@ enum UsageEventType {
   GENERATION_REQUESTED
   GENERATION_COMPLETED
   GENERATION_FAILED
+  RUN_DELIVERED
+  RUN_DELIVERY_FAILED
+  RUN_EXPORT_DOWNLOADED
 }
 
 enum IntegrationProvider {
@@ -45,6 +48,16 @@ enum IntegrationStatus {
   NOT_CONNECTED
   CONNECTED
   ERROR
+}
+
+enum RunDeliveryProvider {
+  GOOGLE_DOCS
+}
+
+enum RunDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
 }
 
 enum SecurityEventType {
@@ -72,6 +85,7 @@ model User {
   generationRuns         GenerationRun[]
   usageEvents            UsageEvent[]
   integrationConnections IntegrationConnection[]
+  runDeliveries          RunDelivery[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens    PasswordResetToken[]
   securityEvents         SecurityEvent[]
@@ -93,6 +107,7 @@ model Workspace {
   structuredOutputs      StructuredOutput[]
   usageEvents            UsageEvent[]
   integrationConnections IntegrationConnection[]
+  runDeliveries          RunDelivery[]
 }
 
 model WorkspaceMembership {
@@ -185,6 +200,7 @@ model GenerationRun {
   preset            Preset?          @relation(fields: [presetId], references: [id], onDelete: SetNull)
   initiatedBy       User             @relation(fields: [initiatedById], references: [id], onDelete: Cascade)
   structuredOutput  StructuredOutput?
+  deliveries        RunDelivery[]
 }
 
 model StructuredOutput {
@@ -213,6 +229,29 @@ model UsageEvent {
   createdAt   DateTime       @default(now())
   workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RunDelivery {
+  id            String              @id @default(cuid())
+  runId          String
+  workspaceId    String
+  initiatedById  String
+  provider       RunDeliveryProvider
+  status         RunDeliveryStatus   @default(PENDING)
+  title          String?
+  externalId     String?
+  externalUrl    String?
+  errorMessage   String?
+  metadata       Json?
+  deliveredAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  run            GenerationRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  initiatedBy    User                @relation(fields: [initiatedById], references: [id], onDelete: Cascade)
+
+  @@unique([runId, provider])
+  @@index([workspaceId, provider, createdAt(sort: Desc)])
 }
 
 model IntegrationConnection {
