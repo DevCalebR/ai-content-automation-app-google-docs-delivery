@@ -7,6 +7,19 @@ type GoogleDocBlock = {
   text: string;
 };
 
+type GoogleApiError = Error & {
+  code?: number;
+  status?: number;
+  response?: {
+    status?: number;
+    data?: {
+      error?: {
+        message?: string;
+      };
+    };
+  };
+};
+
 function getNamedStyleType(kind: GoogleDocBlock["kind"]) {
   switch (kind) {
     case "title":
@@ -63,13 +76,69 @@ function buildGoogleDocsRequests(blocks: GoogleDocBlock[]) {
   return requests;
 }
 
+function getGoogleApiStatus(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const googleError = error as GoogleApiError;
+
+  return googleError.status ?? googleError.code ?? googleError.response?.status ?? null;
+}
+
+function getGoogleApiMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const googleError = error as GoogleApiError;
+
+  return googleError.response?.data?.error?.message ?? null;
+}
+
+function mapGoogleDocsFolderAccessError(error: unknown) {
+  const status = getGoogleApiStatus(error);
+  const apiMessage = getGoogleApiMessage(error)?.toLowerCase() ?? "";
+
+  if (status === 404 || apiMessage.includes("file not found")) {
+    return new Error(
+      "We couldn’t find that Google Drive folder. Check the folder ID and confirm the folder is shared with the delivery service account.",
+    );
+  }
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    apiMessage.includes("insufficient") ||
+    apiMessage.includes("permission")
+  ) {
+    return new Error(
+      "The delivery service account can’t access that Google Drive folder yet. Share the folder with the service account as an Editor, then try again.",
+    );
+  }
+
+  return new Error(
+    "We couldn’t verify that Google Drive folder right now. Confirm the server credentials are valid and try again.",
+  );
+}
+
 export async function validateGoogleDocsFolderAccess(folderId: string) {
   const drive = getGoogleDriveClient();
-  const response = await drive.files.get({
-    fileId: folderId,
-    fields: "id,name,mimeType",
-    supportsAllDrives: true,
-  });
+  let response;
+
+  try {
+    response = await drive.files.get({
+      fileId: folderId,
+      fields: "id,name,mimeType,driveId",
+      supportsAllDrives: true,
+    });
+  } catch (error) {
+    throw mapGoogleDocsFolderAccessError(error);
+  }
 
   if (response.data.mimeType !== "application/vnd.google-apps.folder") {
     throw new Error("The Google Drive location must be a folder.");

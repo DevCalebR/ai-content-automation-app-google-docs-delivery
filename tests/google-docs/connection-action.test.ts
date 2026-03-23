@@ -153,4 +153,47 @@ describe("saveGoogleDocsConnectionAction", () => {
       titlePrefix: "North Star",
     });
   });
+
+  it("preserves the submitted values when folder validation fails", async () => {
+    validateGoogleDocsFolderAccessMock.mockRejectedValue(
+      new Error(
+        "The delivery service account can’t access that Google Drive folder yet. Share the folder with the service account as an Editor, then try again.",
+      ),
+    );
+
+    const { saveGoogleDocsConnectionAction } = await import(
+      "@/app/(app)/app/actions"
+    );
+    const { initialGoogleDocsSettingsState } = await import("@/lib/google-docs/state");
+    const formData = new FormData();
+    formData.set("workspaceId", "workspace-1");
+    formData.set("folderId", "folder-private");
+    formData.set("titlePrefix", "North Star");
+
+    const result = await saveGoogleDocsConnectionAction(initialGoogleDocsSettingsState, formData);
+
+    expect(integrationConnectionUpsertMock).toHaveBeenCalledWith({
+      where: {
+        workspaceId_provider: {
+          workspaceId: "workspace-1",
+          provider: "GOOGLE_DOCS",
+        },
+      },
+      create: expect.objectContaining({
+        status: "ERROR",
+      }),
+      update: expect.objectContaining({
+        status: "ERROR",
+      }),
+    });
+    expect(result).toEqual({
+      status: "error",
+      message:
+        "The delivery service account can’t access that Google Drive folder yet. Share the folder with the service account as an Editor, then try again.",
+      values: {
+        folderId: "folder-private",
+        titlePrefix: "North Star",
+      },
+    });
+  });
 });
