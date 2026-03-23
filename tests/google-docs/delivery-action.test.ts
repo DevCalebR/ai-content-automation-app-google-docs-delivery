@@ -1,5 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+class MockGoogleDocsDeliveryError extends Error {
+  readonly stage: string;
+  readonly kind: string;
+  readonly details?: {
+    status: number | null;
+    apiMessage: string | null;
+    apiReason: string | null;
+  };
+
+  constructor(
+    message: string,
+    stage: string,
+    kind: string,
+    details?: {
+      status: number | null;
+      apiMessage: string | null;
+      apiReason: string | null;
+    },
+  ) {
+    super(message);
+    this.name = "GoogleDocsDeliveryError";
+    this.stage = stage;
+    this.kind = kind;
+    this.details = details;
+  }
+}
+
 const requireSessionMock = vi.fn();
 const getWorkspaceAuthorizationForUserMock = vi.fn();
 const deliverStructuredOutputToGoogleDocsMock = vi.fn();
@@ -33,6 +60,10 @@ vi.mock("@/lib/workspaces/service", async () => {
 
 vi.mock("@/lib/google-docs/delivery", () => ({
   deliverStructuredOutputToGoogleDocs: deliverStructuredOutputToGoogleDocsMock,
+}));
+
+vi.mock("@/lib/google-docs/service", () => ({
+  isGoogleDocsDeliveryError: (error: unknown) => error instanceof MockGoogleDocsDeliveryError,
 }));
 
 vi.mock("@/lib/logger", async () => {
@@ -165,6 +196,25 @@ describe("deliverRunToGoogleDocsAction", () => {
         },
       },
     });
+    expect(logAuditEventMock).toHaveBeenCalledWith({
+      action: "google_docs.delivery.started",
+      userId: "user-1",
+      workspaceId: "workspace-1",
+      metadata: {
+        runId: "run-1",
+        folderId: "folder-123",
+        title: "North Star · North Star Media content plan · Mar 22, 2026",
+      },
+    });
+    expect(logAuditEventMock).toHaveBeenCalledWith({
+      action: "google_docs.delivery.succeeded",
+      userId: "user-1",
+      workspaceId: "workspace-1",
+      metadata: {
+        runId: "run-1",
+        documentId: "doc-1",
+      },
+    });
     expect(result).toEqual({
       status: "success",
       message: "Run delivered to Google Docs.",
@@ -172,9 +222,18 @@ describe("deliverRunToGoogleDocsAction", () => {
     });
   });
 
-  it("marks the delivery failed when Google Docs delivery throws", async () => {
+  it("marks the delivery failed and logs the delivery stage when Google Docs delivery throws", async () => {
     deliverStructuredOutputToGoogleDocsMock.mockRejectedValue(
-      new Error("Google Docs delivery failed."),
+      new MockGoogleDocsDeliveryError(
+        "Google Docs created the document, but the delivery service account can’t add it to that Drive folder. Share the folder with the service account as an Editor, then try again.",
+        "document_move",
+        "permission",
+        {
+          status: 403,
+          apiMessage: "The user does not have sufficient permissions for this file.",
+          apiReason: "insufficientFilePermissions",
+        },
+      ),
     );
 
     const { deliverRunToGoogleDocsAction } = await import("@/app/(app)/app/actions");
@@ -185,7 +244,22 @@ describe("deliverRunToGoogleDocsAction", () => {
 
     const result = await deliverRunToGoogleDocsAction(initialGoogleDocsDeliveryState, formData);
 
-    expect(logErrorMock).toHaveBeenCalledWith(expect.any(Error), "google-docs.delivery");
+    expect(logErrorMock).toHaveBeenCalledWith(
+      {
+        name: "GoogleDocsDeliveryError",
+        message:
+          "Google Docs created the document, but the delivery service account can’t add it to that Drive folder. Share the folder with the service account as an Editor, then try again.",
+        stage: "document_move",
+        kind: "permission",
+        details: {
+          status: 403,
+          apiMessage: "The user does not have sufficient permissions for this file.",
+          apiReason: "insufficientFilePermissions",
+        },
+        runId: "run-1",
+      },
+      "google-docs.document_move",
+    );
     expect(runDeliveryUpdateMock).toHaveBeenCalledWith({
       where: {
         runId_provider: {
@@ -195,7 +269,8 @@ describe("deliverRunToGoogleDocsAction", () => {
       },
       data: {
         status: "FAILED",
-        errorMessage: "Google Docs delivery failed.",
+        errorMessage:
+          "Google Docs created the document, but the delivery service account can’t add it to that Drive folder. Share the folder with the service account as an Editor, then try again.",
       },
     });
     expect(usageEventCreateMock).toHaveBeenCalledWith({
@@ -209,9 +284,20 @@ describe("deliverRunToGoogleDocsAction", () => {
         },
       },
     });
+    expect(logAuditEventMock).toHaveBeenCalledWith({
+      action: "google_docs.delivery.failed",
+      userId: "user-1",
+      workspaceId: "workspace-1",
+      metadata: {
+        runId: "run-1",
+        stage: "document_move",
+        kind: "permission",
+      },
+    });
     expect(result).toEqual({
       status: "error",
-      message: "Google Docs delivery failed.",
+      message:
+        "Google Docs created the document, but the delivery service account can’t add it to that Drive folder. Share the folder with the service account as an Editor, then try again.",
     });
   });
 });

@@ -663,6 +663,17 @@ export async function deliverRunToGoogleDocsAction(
     },
   });
 
+  logAuditEvent({
+    action: "google_docs.delivery.started",
+    userId: session.user.id,
+    workspaceId: authorization.workspace.id,
+    metadata: {
+      runId: run.id,
+      folderId: connectionMetadata.folderId,
+      title: deliveryTitle,
+    },
+  });
+
   try {
     const { deliverStructuredOutputToGoogleDocs } = await import("@/lib/google-docs/delivery");
     const deliveredDocument = await deliverStructuredOutputToGoogleDocs({
@@ -722,7 +733,40 @@ export async function deliverRunToGoogleDocsAction(
       documentUrl: deliveredDocument.url,
     };
   } catch (error) {
-    logError(error, "google-docs.delivery");
+    const { isGoogleDocsDeliveryError } = await import("@/lib/google-docs/service");
+    const googleDocsError = isGoogleDocsDeliveryError(error) ? error : null;
+    const errorContext = googleDocsError
+      ? `google-docs.${googleDocsError.stage}`
+      : "google-docs.delivery";
+    const errorMessage =
+      error instanceof Error ? error.message : "Google Docs delivery failed.";
+
+    logError(
+      googleDocsError
+        ? {
+            name: googleDocsError.name,
+            message: googleDocsError.message,
+            stage: googleDocsError.stage,
+            kind: googleDocsError.kind,
+            details: googleDocsError.details,
+            runId: run.id,
+          }
+        : {
+            message: errorMessage,
+            runId: run.id,
+          },
+      errorContext,
+    );
+    logAuditEvent({
+      action: "google_docs.delivery.failed",
+      userId: session.user.id,
+      workspaceId: authorization.workspace.id,
+      metadata: {
+        runId: run.id,
+        stage: googleDocsError?.stage ?? "unknown",
+        kind: googleDocsError?.kind ?? "unknown",
+      },
+    });
 
     await db.runDelivery.update({
       where: {
@@ -733,8 +777,7 @@ export async function deliverRunToGoogleDocsAction(
       },
       data: {
         status: "FAILED",
-        errorMessage:
-          error instanceof Error ? error.message : "Google Docs delivery failed.",
+        errorMessage: errorMessage,
       },
     });
 
@@ -755,8 +798,7 @@ export async function deliverRunToGoogleDocsAction(
 
     return {
       status: "error",
-      message:
-        error instanceof Error ? error.message : "Google Docs delivery failed.",
+      message: errorMessage,
     };
   }
 }
