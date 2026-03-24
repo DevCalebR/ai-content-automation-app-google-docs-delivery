@@ -58,4 +58,24 @@ describe("authOptions", () => {
 
     expect(token).toEqual({});
   });
+
+  it("invalidates JWT sessions when the persisted user is no longer verified", async () => {
+    const jwtCallback = authOptions.callbacks?.jwt;
+
+    expect(jwtCallback).toBeDefined();
+
+    vi.spyOn(db.user, "findUnique").mockResolvedValue({
+      emailVerified: null,
+      updatedAt: new Date("2026-03-21T00:00:01.000Z"),
+    } as never);
+
+    const token = await jwtCallback?.({
+      token: {
+        authVersion: new Date("2026-03-21T00:00:01.000Z").getTime(),
+        sub: "user_123",
+      },
+    } as never);
+
+    expect(token).toEqual({});
+  });
 });
