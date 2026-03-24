@@ -2,7 +2,14 @@ import { hash } from "bcryptjs";
 import type { PrismaClient } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logAuditEvent, logError } from "@/lib/logger";
-import { signUpSchema } from "@/lib/validations/auth";
+import {
+  buildRegisterFormValues,
+  getRegisterFieldErrors,
+  getRegisterSafeValues,
+  signUpSchema,
+  type RegisterFieldErrors,
+  type RegisterSafeValues,
+} from "@/lib/validations/auth";
 import { consumeSecurityRateLimit } from "@/lib/auth/rate-limit";
 import { issueEmailVerificationToken } from "@/lib/auth/tokens";
 import { sendTransactionalEmail } from "@/lib/email/service";
@@ -17,6 +24,8 @@ export type RegisterUserResult =
   | {
       status: "error";
       message: string;
+      values: RegisterSafeValues;
+      fieldErrors: RegisterFieldErrors;
     }
   | {
       status: "success";
@@ -37,12 +46,15 @@ export async function registerUser(
     sendEmail?: typeof sendTransactionalEmail;
   } = {},
 ): Promise<RegisterUserResult> {
-  const parsed = signUpSchema.safeParse(input);
+  const formValues = buildRegisterFormValues(input);
+  const parsed = signUpSchema.safeParse(formValues);
 
   if (!parsed.success) {
     return {
       status: "error",
-      message: parsed.error.issues[0]?.message ?? "Enter valid account details.",
+      message: "Please correct the highlighted fields.",
+      values: getRegisterSafeValues(formValues),
+      fieldErrors: getRegisterFieldErrors(parsed.error),
     };
   }
 
@@ -64,6 +76,8 @@ export async function registerUser(
     return {
       status: "error",
       message: "Too many attempts. Try again shortly.",
+      values: getRegisterSafeValues(formValues),
+      fieldErrors: {},
     };
   }
 
@@ -99,6 +113,8 @@ export async function registerUser(
     return {
       status: "error",
       message: "We couldn't start email verification. Try again.",
+      values: getRegisterSafeValues(formValues),
+      fieldErrors: {},
     };
   }
 
