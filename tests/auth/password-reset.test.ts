@@ -99,4 +99,43 @@ describe("password reset flow", () => {
       expect(newPasswordAuth?.email).toBe(email);
     });
   });
+
+  it("keeps forgot-password available when security event queries fail", async () => {
+    await runWithRollback(async (tx) => {
+      const email = `degraded-reset-${crypto.randomUUID()}@example.com`;
+      const delivered: { previewUrl?: string }[] = [];
+
+      await tx.user.create({
+        data: {
+          email,
+          name: "Reset User",
+          emailVerified: new Date(),
+          passwordHash: await hash("SuperSecurePass123", 12),
+        },
+      });
+
+      vi.spyOn(tx.securityEvent, "count").mockRejectedValue(
+        new Error("SecurityEvent table missing."),
+      );
+
+      const result = await requestPasswordReset(
+        { email },
+        {
+          database: tx,
+          audit: vi.fn(),
+          sendEmail: async (message) => {
+            delivered.push(message);
+          },
+        },
+      );
+
+      expect(result).toEqual({
+        status: "success",
+        message:
+          "If an account matches that address, a password reset link will arrive shortly.",
+      });
+      expect(delivered).toHaveLength(1);
+      expect(delivered[0]?.previewUrl).toContain("/reset-password?");
+    });
+  });
 });

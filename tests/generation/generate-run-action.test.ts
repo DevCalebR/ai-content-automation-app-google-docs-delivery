@@ -201,4 +201,20 @@ describe("generateRunAction", () => {
       },
     });
   });
+
+  it("preserves the sign-in redirect for unauthenticated generation attempts", async () => {
+    requireSessionMock.mockRejectedValue(new Error("NEXT_REDIRECT:/sign-in"));
+
+    const { generateRunAction } = await import("@/app/(app)/app/actions");
+    const formData = new FormData();
+    formData.set("workspaceId", "workspace-1");
+    formData.set("briefId", "brief-1");
+    formData.set("presetId", "");
+
+    await expect(generateRunAction(formData)).rejects.toThrow("NEXT_REDIRECT:/sign-in");
+
+    expect(generationRunCreateMock).not.toHaveBeenCalled();
+    expect(generationRunUpdateMock).not.toHaveBeenCalled();
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
 });
