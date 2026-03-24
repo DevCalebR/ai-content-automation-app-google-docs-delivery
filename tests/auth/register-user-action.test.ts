@@ -15,6 +15,16 @@ vi.mock("@/lib/auth/register", () => ({
 }));
 
 describe("registerUserAction", () => {
+  const initialState = {
+    status: "idle" as const,
+    values: {
+      name: "",
+      email: "",
+    },
+    fieldErrors: {},
+    submissionId: 0,
+  };
+
   beforeEach(() => {
     redirectMock.mockClear();
     registerUserMock.mockReset();
@@ -23,7 +33,14 @@ describe("registerUserAction", () => {
   it("returns only a safe error state when registration fails", async () => {
     registerUserMock.mockResolvedValue({
       status: "error",
-      message: "An account with this email already exists.",
+      message: "Please correct the highlighted fields.",
+      values: {
+        name: "Casey Operator",
+        email: "casey@example.com",
+      },
+      fieldErrors: {
+        email: "Enter a valid work email.",
+      },
     });
 
     const { registerUserAction } = await import("@/app/(auth)/actions");
@@ -32,11 +49,19 @@ describe("registerUserAction", () => {
     formData.set("email", "casey@example.com");
     formData.set("password", "SuperSecurePass123");
 
-    const result = await registerUserAction({ status: "idle" }, formData);
+    const result = await registerUserAction(initialState, formData);
 
     expect(result).toEqual({
       status: "error",
-      message: "An account with this email already exists.",
+      message: "Please correct the highlighted fields.",
+      values: {
+        name: "Casey Operator",
+        email: "casey@example.com",
+      },
+      fieldErrors: {
+        email: "Enter a valid work email.",
+      },
+      submissionId: 1,
     });
     expect("password" in result).toBe(false);
     expect(redirectMock).not.toHaveBeenCalled();
@@ -55,7 +80,7 @@ describe("registerUserAction", () => {
     formData.set("email", "casey@example.com");
     formData.set("password", "SuperSecurePass123");
 
-    await expect(registerUserAction({ status: "idle" }, formData)).rejects.toThrow(
+    await expect(registerUserAction(initialState, formData)).rejects.toThrow(
       "NEXT_REDIRECT:/sign-in?registered=1&email=casey%40example.com",
     );
     expect(redirectMock).toHaveBeenCalledWith(

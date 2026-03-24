@@ -5,15 +5,22 @@ import { registerUser } from "@/lib/auth/register";
 import { resendVerificationEmail } from "@/lib/auth/email-verification";
 import { requestPasswordReset, resetPassword } from "@/lib/auth/password-reset";
 import type { ActionState } from "@/components/ui/form-state";
+import type { RegisterFieldErrors, RegisterSafeValues } from "@/lib/validations/auth";
 
 export type RegisterState =
   | {
       status: "idle";
       message?: string;
+      values: RegisterSafeValues;
+      fieldErrors: RegisterFieldErrors;
+      submissionId: number;
     }
   | {
       status: "error";
       message: string;
+      values: RegisterSafeValues;
+      fieldErrors: RegisterFieldErrors;
+      submissionId: number;
     };
 
 export async function registerUserAction(
@@ -29,7 +36,10 @@ export async function registerUserAction(
   });
 
   if (result.status === "error") {
-    return result;
+    return {
+      ...result,
+      submissionId: (prevState.submissionId ?? 0) + 1,
+    };
   }
 
   redirect(result.redirectTo);
