@@ -35,7 +35,9 @@ The sign-up flow is intentionally secure: after registration, the server redirec
 - Real OpenAI generation path using structured outputs
 - Saved run history and results workspace with section-level copy actions
 - Deterministic run exports as markdown and plain text
-- Workspace-managed Google Docs delivery using a shared Drive folder and service-account credentials
+- Google Docs delivery through either:
+  - workspace-owner Google OAuth for My Drive folders
+  - legacy shared-folder delivery through a service account
 
 ## Local setup
 
@@ -63,6 +65,8 @@ SMTP_PASSWORD=
 SMTP_SECURE=false
 GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY=
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
 NODE_ENV=development
 SEED_DEMO_ACCOUNT=false
 SEED_DEMO_EMAIL=demo@example.com
@@ -142,14 +146,20 @@ Each saved run stores:
 
 ## Google Docs delivery
 
-The current delivery implementation is workspace-managed rather than per-user OAuth. To enable it:
+The app now supports two workspace delivery modes:
 
-1. Create a Google Cloud service account with Google Docs and Google Drive API access.
-2. Add `GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY` to the server environment.
-3. Share a Google Drive folder with that service account.
-4. Save the shared folder ID in `/app/workspaces/[workspaceId]/settings`.
+1. Preferred My Drive path:
+   - Add `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` to the server environment.
+   - Open `/app/workspaces/[workspaceId]/settings`.
+   - Connect a Google account in the My Drive section.
+   - Save the target folder ID for that connected account.
+   - Completed runs will create a Google Doc directly in that folder.
+2. Legacy shared-folder path:
+   - Add `GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY`.
+   - Share a Drive folder with the service account.
+   - Save that folder ID in the service account section of workspace settings.
 
-Once configured, workspace owners can deliver any completed run to Google Docs from the results page. The app stores the delivery record, link, and status in the database.
+Both modes store delivery state in `RunDelivery`. The current active delivery mode is selected when the owner saves a folder in settings.
 
 ## Data model summary
 
@@ -162,7 +172,7 @@ Once configured, workspace owners can deliver any completed run to Google Docs f
 - `StructuredOutput` stores the normalized generated result
 - `RunDelivery` stores per-run delivery status, destination metadata, and the external Google Docs link
 - `UsageEvent` is the audit-friendly event placeholder
-- `IntegrationConnection` stores the workspace Google Docs destination configuration
+- `IntegrationConnection` stores the active Google Docs delivery mode, OAuth tokens, and folder configuration
 
 ## Seed notes
 
@@ -187,5 +197,6 @@ Focused hardening tests use Vitest in Node mode. The current suite covers secure
 - background job execution for long generations
 - billing and quota enforcement
 - richer output families such as carousels and scripts
-- per-user Google OAuth if the product needs user-owned destinations instead of workspace-managed delivery
+- OAuth token refresh persistence and reconnect/revoke UX polish
+- stronger Google Docs integration coverage against a live Google Workspace test account
 - deeper run comparison and approval workflows

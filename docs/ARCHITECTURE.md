@@ -21,7 +21,7 @@ The app uses a production-first SaaS architecture for structured content plannin
 7. `lib/results/`
    Deterministic formatting helpers shared by results rendering, downloads, and Google Docs delivery.
 8. `lib/google-docs/`
-   Workspace delivery configuration, Google API clients, and Google Docs document creation.
+   Workspace delivery configuration, Google API clients, OAuth state/tokens, and Google Docs document creation.
 9. `prisma/`
    Schema, migrations, and seed entrypoint.
 
@@ -61,15 +61,21 @@ This keeps auth durable and self-contained without depending on a third-party ho
 1. A completed `GenerationRun` with `StructuredOutput` is opened in the results workspace.
 2. `lib/results/format.ts` parses the stored JSON fields and builds deterministic section copy, markdown, and plain-text exports.
 3. The download route uses the same formatter, so exports are generated from normalized persistence rather than UI scraping.
-4. Workspace owners can configure a Google Drive folder on the settings page.
-5. Google Docs delivery creates or updates a `RunDelivery` record, renders the run into readable section blocks, and writes a real Google Doc into the configured folder.
-6. Results and history views read the stored `RunDelivery` record to show delivery state and the external document link.
+4. Workspace owners can configure Google Docs delivery on the settings page.
+5. The preferred My Drive path uses a workspace-owner Google OAuth connection plus a saved folder ID.
+6. The legacy shared-folder path still uses the workspace service account.
+7. Google Docs delivery creates or updates a `RunDelivery` record, renders the run into readable section blocks, and writes a real Google Doc into the configured folder.
+8. Results and history views read the stored `RunDelivery` record to show delivery state and the external document link.
 
 ## Delivery model
 
 - `IntegrationConnection` stores the workspace-level Google Docs destination configuration.
+- `IntegrationConnection` also stores the encrypted OAuth token set when a workspace owner connects Google account access.
 - `RunDelivery` stores per-run delivery status, Google document metadata, and the link back to the external document.
-- The current implementation uses a workspace-managed Google service account, which keeps the first real delivery flow production-safe without shipping partial OAuth UX.
+- `StructuredOutput` remains the source of truth for rendered results, downloads, and Google Docs delivery content.
+- The app now supports two explicit delivery modes:
+  - `USER_OAUTH` for My Drive delivery through a connected Google account
+  - `SERVICE_ACCOUNT` for the legacy shared-folder fallback
 
 ## Extension points
 

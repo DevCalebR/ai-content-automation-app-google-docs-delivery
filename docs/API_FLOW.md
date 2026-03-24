@@ -47,8 +47,13 @@ Phase 1 uses server actions for core app mutations rather than large API route h
 
 - Validates the workspace folder ID with `googleDocsConnectionFormSchema`
 - Restricts writes to workspace owners
-- Validates folder access through the Google Drive API
-- Upserts a durable `IntegrationConnection` record with workspace delivery metadata
+- Supports two modes:
+  - `USER_OAUTH` for a connected Google account and My Drive folder delivery
+  - `SERVICE_ACCOUNT` for the legacy shared-folder fallback
+- `app/api/google-docs/connect/route.ts` starts the Google OAuth flow for a workspace owner
+- `app/api/google-docs/callback/route.ts` exchanges the authorization code and stores encrypted tokens in `IntegrationConnection`
+- Folder validation runs through the correct Drive client for the selected delivery mode
+- Upserts a durable `IntegrationConnection` record with the active delivery mode, encrypted tokens, and workspace delivery metadata
 
 ### Google Docs delivery
 
@@ -57,6 +62,8 @@ Phase 1 uses server actions for core app mutations rather than large API route h
 - Reads workspace Google Docs connection metadata
 - Upserts `RunDelivery` to `PENDING`
 - Creates a real Google Doc from the normalized stored result
+  - `USER_OAUTH` mode creates the Google Doc directly inside the user-authorized folder
+  - `SERVICE_ACCOUNT` mode preserves the existing create-then-move shared-folder flow
 - Updates `RunDelivery` to `DELIVERED` or `FAILED`
 - Revalidates results and history views
 

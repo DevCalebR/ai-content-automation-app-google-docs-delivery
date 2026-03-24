@@ -46,8 +46,11 @@
 
 - Workspace settings can be updated by the owner.
 - Workspace members see read-only settings state and cannot perform owner-only mutations.
-- Owners can save a shared Google Drive folder ID for Google Docs delivery.
+- Owners can connect a Google account from workspace settings when OAuth env vars are configured.
+- Owners can save a My Drive folder ID after the Google account is connected.
+- Owners can still save a shared Google Drive folder ID for the legacy service-account delivery path.
 - Non-owners cannot change Google Docs delivery settings.
+- The settings page clearly shows which Google Docs delivery mode is active.
 - A successful delivery creates a Google Doc and shows the document link back in results and history.
 - A failed delivery records a failed state without removing prior saved run data.
 

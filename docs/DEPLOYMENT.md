@@ -5,7 +5,8 @@
 - Vercel for the Next.js application
 - Managed PostgreSQL for production
 - Server-side environment variables for auth and OpenAI secrets
-- A Google Cloud service account for Google Docs delivery
+- Google OAuth client credentials for My Drive delivery
+- Optional Google Cloud service account for the legacy shared-folder fallback
 
 ## Required environment variables
 
@@ -25,6 +26,8 @@ SMTP_PASSWORD=
 SMTP_SECURE=false
 GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY=
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
 NODE_ENV=production
 ```
 
@@ -39,9 +42,15 @@ npm run db:migrate:deploy
 ```
 
 4. Build and deploy the Next.js application.
-5. Share a Google Drive folder with the service account email.
-6. Save that folder ID in the workspace settings page.
-7. Verify sign-up, sign-in, workspace creation, brief save, generation, exports, and Google Docs delivery.
+5. For My Drive delivery, configure a Google OAuth client with the callback URL:
+
+```text
+https://your-app-domain.com/api/google-docs/callback
+```
+
+6. Add `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
+7. Optionally add the service-account env vars if you still need the shared-folder fallback path.
+8. Verify sign-up, sign-in, workspace creation, brief save, generation, exports, Google OAuth connection, and Google Docs delivery.
 
 ## Notes
 
@@ -49,5 +58,6 @@ npm run db:migrate:deploy
 - Keep `NEXTAUTH_SECRET` unique per environment.
 - Use `DIRECT_DATABASE_URL` for Prisma migrations where the provider requires a direct connection.
 - Configure transactional email before enabling production sign-up, verification, and password reset flows.
-- The current Google Docs flow is workspace-managed through a shared folder plus server-side service-account credentials.
+- The preferred production delivery path is now workspace-owner Google OAuth for My Drive folders.
+- The service-account flow remains available as a legacy fallback for shared-folder delivery and Shared Drive use cases.
 - Store the Google service account private key as a multiline secret and preserve newlines when your deploy platform requires escaping.
