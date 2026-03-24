@@ -4,6 +4,7 @@ import type { StructuredOutput } from "@prisma/client";
 import { createGoogleDocsDelivery } from "@/lib/google-docs/service";
 import { buildGoogleDocsDocumentTitle } from "@/lib/google-docs/connection";
 import type { GoogleDocsConnectionMetadata } from "@/lib/validations/google-docs";
+import type { GoogleDocsApiClients } from "@/lib/google-docs/client";
 import { buildRunExportContent } from "@/lib/results/format";
 
 export async function deliverStructuredOutputToGoogleDocs(input: {
@@ -15,6 +16,7 @@ export async function deliverStructuredOutputToGoogleDocs(input: {
     "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
   >;
   connectionMetadata: GoogleDocsConnectionMetadata;
+  clients?: GoogleDocsApiClients;
 }) {
   const exportContent = buildRunExportContent({
     businessName: input.businessName,
@@ -33,5 +35,8 @@ export async function deliverStructuredOutputToGoogleDocs(input: {
     title,
     folderId: input.connectionMetadata.folderId,
     blocks: exportContent.googleDocBlocks,
+    authMode: input.connectionMetadata.authMode,
+    docsClient: input.clients?.docs,
+    driveClient: input.clients?.drive,
   });
 }

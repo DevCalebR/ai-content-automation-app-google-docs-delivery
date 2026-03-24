@@ -18,9 +18,13 @@ import {
 import { assertRateLimitReady } from "@/lib/rate-limit";
 import { generateCampaignPlan } from "@/lib/ai/generate";
 import type { ActionState } from "@/components/ui/form-state";
+import type { GoogleDocsApiClients } from "@/lib/google-docs/client";
 import {
   buildGoogleDocsDocumentTitle,
+  getGoogleDocsConnectionState,
   getGoogleDocsConnectionMetadata,
+  hasGoogleDocsOAuthRefreshToken,
+  mergeGoogleDocsConnectionState,
 } from "@/lib/google-docs/connection";
 import {
   initialGoogleDocsDeliveryState,
@@ -31,6 +35,7 @@ import {
 import {
   googleDocsConnectionFormSchema,
   googleDocsDeliveryRequestSchema,
+  type GoogleDocsAuthMode,
 } from "@/lib/validations/google-docs";
 import {
   createWorkspaceWithOwner,
@@ -433,11 +438,13 @@ export async function saveGoogleDocsConnectionAction(
   void prevState;
   const session = await requireSession();
   const submittedValues = {
+    authMode: String(formData.get("authMode") ?? "SERVICE_ACCOUNT") as GoogleDocsAuthMode,
     folderId: String(formData.get("folderId") ?? "").trim(),
     titlePrefix: String(formData.get("titlePrefix") ?? "").trim(),
   };
   const parsed = googleDocsConnectionFormSchema.safeParse({
     workspaceId: formData.get("workspaceId"),
+    authMode: submittedValues.authMode,
     folderId: submittedValues.folderId,
     titlePrefix: submittedValues.titlePrefix,
   });
@@ -446,7 +453,10 @@ export async function saveGoogleDocsConnectionAction(
     return {
       status: "error",
       message: parsed.error.issues[0]?.message ?? "Enter a valid Google Drive folder ID.",
-      values: submittedValues,
+      values: {
+        folderId: submittedValues.folderId,
+        titlePrefix: submittedValues.titlePrefix,
+      },
     };
   }
 
@@ -459,30 +469,92 @@ export async function saveGoogleDocsConnectionAction(
     return {
       status: "error",
       message: "Only workspace owners can update Google Docs delivery settings.",
-      values: submittedValues,
+      values: {
+        folderId: submittedValues.folderId,
+        titlePrefix: submittedValues.titlePrefix,
+      },
     };
   }
 
-  const { hasGoogleDocsServiceAccountConfig } = await import("@/lib/google-docs/client");
+  const existingConnection = await db.integrationConnection.findFirst({
+    where: {
+      workspaceId: authorization.workspace.id,
+      provider: "GOOGLE_DOCS",
+    },
+  });
+  const existingState = getGoogleDocsConnectionState(existingConnection);
 
-  if (!hasGoogleDocsServiceAccountConfig()) {
+  const {
+    createGoogleDocsOAuthClients,
+    getGoogleDocsServiceAccountClients,
+    hasGoogleDocsOAuthConfig,
+    hasGoogleDocsServiceAccountConfig,
+  } = await import("@/lib/google-docs/client");
+  const { buildStoredGoogleOAuthTokens, getStoredGoogleOAuthTokens } = await import(
+    "@/lib/google-docs/oauth"
+  );
+  const { validateGoogleDocsFolderAccess } = await import("@/lib/google-docs/service");
+
+  if (parsed.data.authMode === "USER_OAUTH") {
+    if (!hasGoogleDocsOAuthConfig()) {
+      return {
+        status: "error",
+        message:
+          "Google account delivery is not configured on the server yet. Add the Google OAuth client ID and secret before connecting a workspace folder.",
+        values: {
+          folderId: submittedValues.folderId,
+          titlePrefix: submittedValues.titlePrefix,
+        },
+      };
+    }
+
+    if (!hasGoogleDocsOAuthRefreshToken(existingConnection)) {
+      return {
+        status: "error",
+        message:
+          "Reconnect the Google account for this workspace before saving a My Drive delivery folder.",
+        values: {
+          folderId: submittedValues.folderId,
+          titlePrefix: submittedValues.titlePrefix,
+        },
+      };
+    }
+  } else if (!hasGoogleDocsServiceAccountConfig()) {
     return {
       status: "error",
       message:
         "Google Docs delivery is not configured on the server yet. Add the service account credentials before connecting a workspace folder.",
-      values: submittedValues,
+      values: {
+        folderId: submittedValues.folderId,
+        titlePrefix: submittedValues.titlePrefix,
+      },
     };
   }
 
   try {
-    const { validateGoogleDocsFolderAccess } = await import("@/lib/google-docs/service");
-    const folder = await validateGoogleDocsFolderAccess(parsed.data.folderId);
-    const metadata = {
+    const clients =
+      parsed.data.authMode === "USER_OAUTH"
+        ? createGoogleDocsOAuthClients(getStoredGoogleOAuthTokens(existingConnection))
+        : getGoogleDocsServiceAccountClients();
+    const folder = await validateGoogleDocsFolderAccess(parsed.data.folderId, {
+      authMode: parsed.data.authMode,
+      driveClient: clients.drive,
+    });
+    const metadata = mergeGoogleDocsConnectionState(existingState, {
+      authMode: parsed.data.authMode,
       folderId: folder.folderId,
       folderName: folder.folderName,
       titlePrefix: parsed.data.titlePrefix?.trim() || undefined,
       configuredAt: new Date().toISOString(),
-    };
+    });
+    const oauthTokens =
+      parsed.data.authMode === "USER_OAUTH"
+        ? buildStoredGoogleOAuthTokens(clients.auth.credentials, existingConnection)
+        : {
+            encryptedAccessToken: existingConnection?.encryptedAccessToken ?? null,
+            encryptedRefreshToken: existingConnection?.encryptedRefreshToken ?? null,
+            expiresAt: existingConnection?.expiresAt ?? null,
+          };
 
     await db.integrationConnection.upsert({
       where: {
@@ -497,11 +569,13 @@ export async function saveGoogleDocsConnectionAction(
         provider: "GOOGLE_DOCS",
         status: "CONNECTED",
         metadata,
+        ...oauthTokens,
       },
       update: {
         userId: session.user.id,
         status: "CONNECTED",
         metadata,
+        ...oauthTokens,
       },
     });
 
@@ -510,6 +584,7 @@ export async function saveGoogleDocsConnectionAction(
       userId: session.user.id,
       workspaceId: authorization.workspace.id,
       metadata: {
+        authMode: parsed.data.authMode,
         folderId: folder.folderId,
         folderName: folder.folderName,
       },
@@ -520,7 +595,10 @@ export async function saveGoogleDocsConnectionAction(
 
     return {
       status: "success",
-      message: `Google Docs delivery is connected to ${folder.folderName}.`,
+      message:
+        parsed.data.authMode === "USER_OAUTH"
+          ? `Google Docs delivery will use the connected Google account for ${folder.folderName}.`
+          : `Google Docs delivery is connected to ${folder.folderName}.`,
       values: {
         folderId: folder.folderId,
         titlePrefix: parsed.data.titlePrefix?.trim() || "",
@@ -541,20 +619,25 @@ export async function saveGoogleDocsConnectionAction(
         userId: session.user.id,
         provider: "GOOGLE_DOCS",
         status: "ERROR",
-        metadata: {
+        metadata: mergeGoogleDocsConnectionState(existingState, {
+          authMode: parsed.data.authMode,
           folderId: parsed.data.folderId,
           titlePrefix: parsed.data.titlePrefix?.trim() || undefined,
           configuredAt: new Date().toISOString(),
-        },
+        }),
+        encryptedAccessToken: existingConnection?.encryptedAccessToken ?? null,
+        encryptedRefreshToken: existingConnection?.encryptedRefreshToken ?? null,
+        expiresAt: existingConnection?.expiresAt ?? null,
       },
       update: {
         userId: session.user.id,
         status: "ERROR",
-        metadata: {
+        metadata: mergeGoogleDocsConnectionState(existingState, {
+          authMode: parsed.data.authMode,
           folderId: parsed.data.folderId,
           titlePrefix: parsed.data.titlePrefix?.trim() || undefined,
           configuredAt: new Date().toISOString(),
-        },
+        }),
       },
     });
 
@@ -564,7 +647,10 @@ export async function saveGoogleDocsConnectionAction(
         error instanceof Error
           ? error.message
           : "We couldn’t validate access to that Google Drive folder.",
-      values: submittedValues,
+      values: {
+        folderId: submittedValues.folderId,
+        titlePrefix: submittedValues.titlePrefix,
+      },
     };
   }
 }
@@ -632,6 +718,57 @@ export async function deliverRunToGoogleDocsAction(
     };
   }
 
+  const {
+    createGoogleDocsOAuthClients,
+    getGoogleDocsServiceAccountClients,
+    hasGoogleDocsOAuthConfig,
+    hasGoogleDocsServiceAccountConfig,
+  } = await import("@/lib/google-docs/client");
+  const {
+    buildStoredGoogleOAuthTokens,
+    getStoredGoogleOAuthTokens,
+    isGoogleDocsOAuthTokenError,
+  } = await import("@/lib/google-docs/oauth");
+
+  if (connectionMetadata.authMode === "USER_OAUTH") {
+    if (!hasGoogleDocsOAuthConfig()) {
+      return {
+        status: "error",
+        message:
+          "Google account delivery is not configured on the server yet. Add the Google OAuth client ID and secret, then reconnect the workspace.",
+      };
+    }
+
+    if (!hasGoogleDocsOAuthRefreshToken(connection)) {
+      await db.integrationConnection.update({
+        where: {
+          workspaceId_provider: {
+            workspaceId: authorization.workspace.id,
+            provider: "GOOGLE_DOCS",
+          },
+        },
+        data: {
+          status: "ERROR",
+        },
+      });
+      revalidatePath(`/app/workspaces/${authorization.workspace.id}/settings`);
+
+      return {
+        status: "error",
+        message:
+          "Reconnect the Google account for this workspace before delivering to My Drive.",
+      };
+    }
+  } else {
+    if (!hasGoogleDocsServiceAccountConfig()) {
+      return {
+        status: "error",
+        message:
+          "Google Docs delivery is not configured on the server yet. Add the service account credentials, then try again.",
+      };
+    }
+  }
+
   const deliveryTitle = buildGoogleDocsDocumentTitle({
     businessName: run.brief.businessName,
     createdAt: run.createdAt,
@@ -667,14 +804,19 @@ export async function deliverRunToGoogleDocsAction(
     action: "google_docs.delivery.started",
     userId: session.user.id,
     workspaceId: authorization.workspace.id,
-    metadata: {
-      runId: run.id,
-      folderId: connectionMetadata.folderId,
-      title: deliveryTitle,
-    },
-  });
+      metadata: {
+        runId: run.id,
+        folderId: connectionMetadata.folderId,
+        title: deliveryTitle,
+        authMode: connectionMetadata.authMode,
+      },
+    });
 
   try {
+    const clients: GoogleDocsApiClients =
+      connectionMetadata.authMode === "USER_OAUTH"
+        ? createGoogleDocsOAuthClients(getStoredGoogleOAuthTokens(connection))
+        : getGoogleDocsServiceAccountClients();
     const { deliverStructuredOutputToGoogleDocs } = await import("@/lib/google-docs/delivery");
     const deliveredDocument = await deliverStructuredOutputToGoogleDocs({
       businessName: run.brief.businessName,
@@ -682,7 +824,23 @@ export async function deliverRunToGoogleDocsAction(
       model: run.model,
       output: run.structuredOutput,
       connectionMetadata,
+      clients,
     });
+
+    if (connectionMetadata.authMode === "USER_OAUTH") {
+      await db.integrationConnection.update({
+        where: {
+          workspaceId_provider: {
+            workspaceId: authorization.workspace.id,
+            provider: "GOOGLE_DOCS",
+          },
+        },
+        data: {
+          status: "CONNECTED",
+          ...buildStoredGoogleOAuthTokens(clients.auth.credentials, connection),
+        },
+      });
+    }
 
     await db.runDelivery.update({
       where: {
@@ -735,11 +893,17 @@ export async function deliverRunToGoogleDocsAction(
   } catch (error) {
     const { isGoogleDocsDeliveryError } = await import("@/lib/google-docs/service");
     const googleDocsError = isGoogleDocsDeliveryError(error) ? error : null;
+    const googleOAuthTokenError = isGoogleDocsOAuthTokenError(error) ? error : null;
     const errorContext = googleDocsError
       ? `google-docs.${googleDocsError.stage}`
-      : "google-docs.delivery";
-    const errorMessage =
-      error instanceof Error ? error.message : "Google Docs delivery failed.";
+      : googleOAuthTokenError
+        ? "google-docs.oauth"
+        : "google-docs.delivery";
+    const errorMessage = googleOAuthTokenError
+      ? googleOAuthTokenError.message
+      : error instanceof Error
+        ? error.message
+        : "Google Docs delivery failed.";
 
     logError(
       googleDocsError
@@ -751,6 +915,13 @@ export async function deliverRunToGoogleDocsAction(
             details: googleDocsError.details,
             runId: run.id,
           }
+        : googleOAuthTokenError
+          ? {
+              name: googleOAuthTokenError.name,
+              message: googleOAuthTokenError.message,
+              code: googleOAuthTokenError.code,
+              runId: run.id,
+            }
         : {
             message: errorMessage,
             runId: run.id,
@@ -763,10 +934,28 @@ export async function deliverRunToGoogleDocsAction(
       workspaceId: authorization.workspace.id,
       metadata: {
         runId: run.id,
-        stage: googleDocsError?.stage ?? "unknown",
-        kind: googleDocsError?.kind ?? "unknown",
+        stage: googleDocsError?.stage ?? (googleOAuthTokenError ? "oauth" : "unknown"),
+        kind: googleDocsError?.kind ?? (googleOAuthTokenError ? "configuration" : "unknown"),
       },
     });
+
+    if (
+      connectionMetadata.authMode === "USER_OAUTH" &&
+      (googleOAuthTokenError || googleDocsError?.kind === "configuration")
+    ) {
+      await db.integrationConnection.update({
+        where: {
+          workspaceId_provider: {
+            workspaceId: authorization.workspace.id,
+            provider: "GOOGLE_DOCS",
+          },
+        },
+        data: {
+          status: "ERROR",
+        },
+      });
+      revalidatePath(`/app/workspaces/${authorization.workspace.id}/settings`);
+    }
 
     await db.runDelivery.update({
       where: {

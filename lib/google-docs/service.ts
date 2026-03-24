@@ -1,6 +1,8 @@
 import "server-only";
 
+import type { docs_v1, drive_v3 } from "googleapis";
 import { getGoogleDocsClient, getGoogleDriveClient } from "@/lib/google-docs/client";
+import type { GoogleDocsAuthMode } from "@/lib/validations/google-docs";
 
 type GoogleDocBlock = {
   kind: "title" | "subtitle" | "heading" | "body";
@@ -18,6 +20,12 @@ export type GoogleDocsDeliveryErrorKind =
   | "permission"
   | "configuration"
   | "unknown";
+
+type GoogleDocsServiceOptions = {
+  authMode?: GoogleDocsAuthMode;
+  docsClient?: docs_v1.Docs;
+  driveClient?: drive_v3.Drive;
+};
 
 type GoogleApiError = Error & {
   code?: number;
@@ -185,6 +193,15 @@ function isGoogleApiEnablementError(apiMessage: string, apiReason: string) {
   );
 }
 
+function isGoogleApiPermissionError(status: number | null, apiMessage: string, apiReason: string) {
+  return (
+    status === 403 ||
+    apiReason.includes("forbidden") ||
+    apiMessage.includes("caller does not have permission") ||
+    apiMessage.includes("does not have permission")
+  );
+}
+
 function buildGoogleDocsDeliveryError(input: {
   stage: GoogleDocsDeliveryStage;
   kind: GoogleDocsDeliveryErrorKind;
@@ -202,18 +219,28 @@ export function isGoogleDocsDeliveryError(error: unknown): error is GoogleDocsDe
   return error instanceof GoogleDocsDeliveryError;
 }
 
-function mapGoogleDocsFolderAccessError(error: unknown) {
+function isUserOAuthMode(authMode: GoogleDocsAuthMode) {
+  return authMode === "USER_OAUTH";
+}
+
+function mapGoogleDocsFolderAccessError(
+  error: unknown,
+  authMode: GoogleDocsAuthMode = "SERVICE_ACCOUNT",
+) {
   const status = getGoogleApiStatus(error);
   const apiMessage = getGoogleApiMessage(error)?.toLowerCase() ?? "";
   const apiReason = getGoogleApiReason(error)?.toLowerCase() ?? "";
   const details = getGoogleApiDetails(error);
+  const usingUserOAuth = isUserOAuthMode(authMode);
 
   if (isGoogleApiEnablementError(apiMessage, apiReason)) {
     return buildGoogleDocsDeliveryError({
       stage: "folder_validation",
       kind: "configuration",
       message:
-        "Google Drive API is not enabled for the delivery service account project. Enable the Google Drive API and try again.",
+        usingUserOAuth
+          ? "Google Drive access is not configured correctly for this workspace’s connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Drive API is not enabled for the delivery service account project. Enable the Google Drive API and try again.",
       details,
     });
   }
@@ -223,7 +250,9 @@ function mapGoogleDocsFolderAccessError(error: unknown) {
       stage: "folder_validation",
       kind: "not_found",
       message:
-        "We couldn’t find that Google Drive folder. Check the folder ID and confirm the folder is shared with the delivery service account.",
+        usingUserOAuth
+          ? "We couldn’t find that Google Drive folder. Check the folder ID and confirm the connected Google account can open it."
+          : "We couldn’t find that Google Drive folder. Check the folder ID and confirm the folder is shared with the delivery service account.",
       details,
     });
   }
@@ -238,7 +267,9 @@ function mapGoogleDocsFolderAccessError(error: unknown) {
       stage: "folder_validation",
       kind: "permission",
       message:
-        "The delivery service account can’t access that Google Drive folder yet. Share the folder with the service account as an Editor, then try again.",
+        usingUserOAuth
+          ? "The connected Google account can’t access that Google Drive folder yet. Choose a folder this account can edit, then try again."
+          : "The delivery service account can’t access that Google Drive folder yet. Share the folder with the service account as an Editor, then try again.",
       details,
     });
   }
@@ -247,22 +278,43 @@ function mapGoogleDocsFolderAccessError(error: unknown) {
     stage: "folder_validation",
     kind: "configuration",
     message:
-      "We couldn’t verify that Google Drive folder right now. Confirm the server credentials are valid and try again.",
+      usingUserOAuth
+        ? "We couldn’t verify that Google Drive folder right now. Reconnect the Google account and try again."
+        : "We couldn’t verify that Google Drive folder right now. Confirm the server credentials are valid and try again.",
     details,
   });
 }
 
-function mapGoogleDocsDocumentCreationError(error: unknown) {
+function mapGoogleDocsDocumentCreationError(
+  error: unknown,
+  authMode: GoogleDocsAuthMode = "SERVICE_ACCOUNT",
+) {
+  const status = getGoogleApiStatus(error);
   const apiMessage = getGoogleApiMessage(error)?.toLowerCase() ?? "";
   const apiReason = getGoogleApiReason(error)?.toLowerCase() ?? "";
   const details = getGoogleApiDetails(error);
+  const usingUserOAuth = isUserOAuthMode(authMode);
 
   if (isGoogleApiEnablementError(apiMessage, apiReason)) {
     return buildGoogleDocsDeliveryError({
       stage: "document_creation",
       kind: "configuration",
       message:
-        "Google Docs API is not enabled for the delivery service account project. Enable the Google Docs API and try again.",
+        usingUserOAuth
+          ? "Google Docs access is not configured correctly for this workspace’s connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Docs API is not enabled for the delivery service account project. Enable the Google Docs API and try again.",
+      details,
+    });
+  }
+
+  if (isGoogleApiPermissionError(status, apiMessage, apiReason)) {
+    return buildGoogleDocsDeliveryError({
+      stage: "document_creation",
+      kind: "permission",
+      message:
+        usingUserOAuth
+          ? "Google Docs rejected document creation for the connected Google account. Confirm that account can create Docs in the selected folder and try again."
+          : "Google Docs rejected document creation for this service account. Confirm the Google Docs API is enabled for the project and that the service account is allowed to create documents.",
       details,
     });
   }
@@ -272,7 +324,9 @@ function mapGoogleDocsDocumentCreationError(error: unknown) {
       stage: "document_creation",
       kind: "configuration",
       message:
-        "Google Docs delivery is not configured correctly on the server. Check the service account credentials and try again.",
+        usingUserOAuth
+          ? "Google Docs delivery is not configured correctly for the connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Docs delivery is not configured correctly on the server. Check the service account credentials and try again.",
       details,
     });
   }
@@ -285,17 +339,23 @@ function mapGoogleDocsDocumentCreationError(error: unknown) {
   });
 }
 
-function mapGoogleDocsDocumentContentError(error: unknown) {
+function mapGoogleDocsDocumentContentError(
+  error: unknown,
+  authMode: GoogleDocsAuthMode = "SERVICE_ACCOUNT",
+) {
   const apiMessage = getGoogleApiMessage(error)?.toLowerCase() ?? "";
   const apiReason = getGoogleApiReason(error)?.toLowerCase() ?? "";
   const details = getGoogleApiDetails(error);
+  const usingUserOAuth = isUserOAuthMode(authMode);
 
   if (isGoogleApiEnablementError(apiMessage, apiReason)) {
     return buildGoogleDocsDeliveryError({
       stage: "document_content",
       kind: "configuration",
       message:
-        "Google Docs API is not enabled for the delivery service account project. Enable the Google Docs API and try again.",
+        usingUserOAuth
+          ? "Google Docs access is not configured correctly for this workspace’s connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Docs API is not enabled for the delivery service account project. Enable the Google Docs API and try again.",
       details,
     });
   }
@@ -305,7 +365,9 @@ function mapGoogleDocsDocumentContentError(error: unknown) {
       stage: "document_content",
       kind: "configuration",
       message:
-        "Google Docs delivery is not configured correctly on the server. Check the service account credentials and try again.",
+        usingUserOAuth
+          ? "Google Docs delivery is not configured correctly for the connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Docs delivery is not configured correctly on the server. Check the service account credentials and try again.",
       details,
     });
   }
@@ -319,18 +381,24 @@ function mapGoogleDocsDocumentContentError(error: unknown) {
   });
 }
 
-function mapGoogleDocsDocumentMoveError(error: unknown) {
+function mapGoogleDocsDocumentMoveError(
+  error: unknown,
+  authMode: GoogleDocsAuthMode = "SERVICE_ACCOUNT",
+) {
   const status = getGoogleApiStatus(error);
   const apiMessage = getGoogleApiMessage(error)?.toLowerCase() ?? "";
   const apiReason = getGoogleApiReason(error)?.toLowerCase() ?? "";
   const details = getGoogleApiDetails(error);
+  const usingUserOAuth = isUserOAuthMode(authMode);
 
   if (isGoogleApiEnablementError(apiMessage, apiReason)) {
     return buildGoogleDocsDeliveryError({
       stage: "document_move",
       kind: "configuration",
       message:
-        "Google Drive API is not enabled for the delivery service account project. Enable the Google Drive API and try again.",
+        usingUserOAuth
+          ? "Google Drive access is not configured correctly for this workspace’s connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Drive API is not enabled for the delivery service account project. Enable the Google Drive API and try again.",
       details,
     });
   }
@@ -340,7 +408,9 @@ function mapGoogleDocsDocumentMoveError(error: unknown) {
       stage: "document_move",
       kind: "not_found",
       message:
-        "Google Docs created the document, but couldn’t find the configured Drive folder. Confirm the folder ID is still correct and shared with the delivery service account.",
+        usingUserOAuth
+          ? "Google Docs created the document, but couldn’t find the configured Drive folder. Confirm the selected folder still exists and try again."
+          : "Google Docs created the document, but couldn’t find the configured Drive folder. Confirm the folder ID is still correct and shared with the delivery service account.",
       details,
     });
   }
@@ -355,7 +425,9 @@ function mapGoogleDocsDocumentMoveError(error: unknown) {
       stage: "document_move",
       kind: "permission",
       message:
-        "Google Docs created the document, but the delivery service account can’t add it to that Drive folder. Share the folder with the service account as an Editor, then try again.",
+        usingUserOAuth
+          ? "Google Docs created the document, but the connected Google account can’t move it into that Drive folder. Confirm the folder permissions and try again."
+          : "Google Docs created the document, but the delivery service account can’t add it to that Drive folder. Share the folder with the service account as an Editor, then try again.",
       details,
     });
   }
@@ -365,7 +437,9 @@ function mapGoogleDocsDocumentMoveError(error: unknown) {
       stage: "document_move",
       kind: "configuration",
       message:
-        "Google Docs delivery is not configured correctly on the server. Check the service account credentials and try again.",
+        usingUserOAuth
+          ? "Google Docs delivery is not configured correctly for the connected Google account. Reconnect Google Docs delivery and try again."
+          : "Google Docs delivery is not configured correctly on the server. Check the service account credentials and try again.",
       details,
     });
   }
@@ -379,8 +453,12 @@ function mapGoogleDocsDocumentMoveError(error: unknown) {
   });
 }
 
-export async function validateGoogleDocsFolderAccess(folderId: string) {
-  const drive = getGoogleDriveClient();
+export async function validateGoogleDocsFolderAccess(
+  folderId: string,
+  options: Pick<GoogleDocsServiceOptions, "authMode" | "driveClient"> = {},
+) {
+  const authMode = options.authMode ?? "SERVICE_ACCOUNT";
+  const drive = options.driveClient ?? getGoogleDriveClient();
   let response;
 
   try {
@@ -390,7 +468,7 @@ export async function validateGoogleDocsFolderAccess(folderId: string) {
       supportsAllDrives: true,
     });
   } catch (error) {
-    throw mapGoogleDocsFolderAccessError(error);
+    throw mapGoogleDocsFolderAccessError(error, authMode);
   }
 
   if (response.data.mimeType !== "application/vnd.google-apps.folder") {
@@ -407,10 +485,64 @@ export async function createGoogleDocsDelivery(input: {
   title: string;
   folderId: string;
   blocks: GoogleDocBlock[];
+  authMode?: GoogleDocsAuthMode;
+  docsClient?: docs_v1.Docs;
+  driveClient?: drive_v3.Drive;
 }) {
-  const docs = getGoogleDocsClient();
-  const drive = getGoogleDriveClient();
+  const authMode = input.authMode ?? "SERVICE_ACCOUNT";
+  const docs = input.docsClient ?? getGoogleDocsClient();
+  const drive = input.driveClient ?? getGoogleDriveClient();
   let createdDocument;
+  let createdFile;
+
+  if (authMode === "USER_OAUTH") {
+    try {
+      createdFile = await drive.files.create({
+        requestBody: {
+          name: input.title,
+          mimeType: "application/vnd.google-apps.document",
+          parents: [input.folderId],
+        },
+        fields: "id,webViewLink",
+        supportsAllDrives: true,
+      });
+    } catch (error) {
+      throw mapGoogleDocsDocumentCreationError(error, authMode);
+    }
+
+    const documentId = createdFile.data.id;
+
+    if (!documentId) {
+      throw buildGoogleDocsDeliveryError({
+        stage: "document_creation",
+        kind: "unknown",
+        message: "Google Drive did not return a document id.",
+      });
+    }
+
+    const requests = buildGoogleDocsRequests(input.blocks);
+
+    if (requests.length) {
+      try {
+        await docs.documents.batchUpdate({
+          documentId,
+          requestBody: {
+            requests,
+          },
+        });
+      } catch (error) {
+        throw mapGoogleDocsDocumentContentError(error, authMode);
+      }
+    }
+
+    return {
+      documentId,
+      title: input.title,
+      url:
+        createdFile.data.webViewLink ??
+        `https://docs.google.com/document/d/${documentId}/edit`,
+    };
+  }
 
   try {
     createdDocument = await docs.documents.create({
@@ -419,7 +551,7 @@ export async function createGoogleDocsDelivery(input: {
       },
     });
   } catch (error) {
-    throw mapGoogleDocsDocumentCreationError(error);
+    throw mapGoogleDocsDocumentCreationError(error, authMode);
   }
 
   const documentId = createdDocument.data.documentId;
@@ -443,7 +575,7 @@ export async function createGoogleDocsDelivery(input: {
         },
       });
     } catch (error) {
-      throw mapGoogleDocsDocumentContentError(error);
+      throw mapGoogleDocsDocumentContentError(error, authMode);
     }
   }
 
@@ -465,7 +597,7 @@ export async function createGoogleDocsDelivery(input: {
       supportsAllDrives: true,
     });
   } catch (error) {
-    throw mapGoogleDocsDocumentMoveError(error);
+    throw mapGoogleDocsDocumentMoveError(error, authMode);
   }
 
   return {
