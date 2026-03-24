@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
@@ -7,18 +8,179 @@ import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import {
   getGoogleDocsServiceAccountEmail,
+  hasGoogleDocsOAuthConfig,
   hasGoogleDocsServiceAccountConfig,
 } from "@/lib/google-docs/client";
-import { getGoogleDocsConnectionMetadata } from "@/lib/google-docs/connection";
+import {
+  getGoogleDocsConnectionMetadata,
+  getGoogleDocsConnectionState,
+  hasGoogleDocsOAuthConnection,
+  hasGoogleDocsOAuthRefreshToken,
+} from "@/lib/google-docs/connection";
 import { getWorkspaceAuthorizationForUser } from "@/lib/workspaces/service";
 
 type PageProps = {
   params: Promise<{ workspaceId: string }>;
+  searchParams: Promise<{ googleDocsStatus?: string }>;
 };
 
-export default async function SettingsPage({ params }: PageProps) {
+function getGoogleDocsNotice(status?: string) {
+  switch (status) {
+    case "oauth-connected":
+      return {
+        tone: "success" as const,
+        message:
+          "Google account access is connected. Save a folder in the My Drive section below to activate user-authorized delivery.",
+      };
+    case "oauth-cancelled":
+      return {
+        tone: "error" as const,
+        message: "Google account connection was cancelled before access was granted.",
+      };
+    case "oauth-denied":
+    case "oauth-failed":
+      return {
+        tone: "error" as const,
+        message:
+          "Google account connection could not be completed. Try connecting the workspace again.",
+      };
+    case "oauth-forbidden":
+      return {
+        tone: "error" as const,
+        message: "Only workspace owners can connect or change Google Docs delivery settings.",
+      };
+    case "oauth-invalid-state":
+    case "oauth-session-expired":
+    case "oauth-session-mismatch":
+      return {
+        tone: "error" as const,
+        message:
+          "The Google account connection expired or no longer matched this session. Start the connection again from workspace settings.",
+      };
+    case "oauth-unavailable":
+      return {
+        tone: "error" as const,
+        message:
+          "Google account delivery is not configured on the server yet. Add the Google OAuth client ID and secret before connecting a workspace.",
+      };
+    case "oauth-refresh-required":
+      return {
+        tone: "error" as const,
+        message:
+          "Google returned access without a durable refresh token. Reconnect the Google account and approve the requested access again before using My Drive delivery.",
+      };
+    default:
+      return null;
+  }
+}
+
+type DeliveryStatus = {
+  badge: string;
+  summary: string;
+  nextStep: string;
+  technical: string;
+};
+
+function getDeliveryStatus(input: {
+  activeMode: "SERVICE_ACCOUNT" | "USER_OAUTH" | null;
+  integrationStatus?: "NOT_CONNECTED" | "CONNECTED" | "ERROR";
+  oauthConnected: boolean;
+  oauthRefreshReady: boolean;
+  oauthReady: boolean;
+  serviceAccountReady: boolean;
+  hasFolder: boolean;
+}): DeliveryStatus {
+  if (input.integrationStatus === "ERROR") {
+    return {
+      badge: "Needs attention",
+      summary:
+        "The current Google Docs delivery destination could not be verified the last time settings were saved.",
+      nextStep:
+        "Open the matching delivery section below, confirm the folder ID and permissions, then save the settings again.",
+      technical: "ERROR",
+    };
+  }
+
+  if (input.activeMode === "USER_OAUTH" && input.hasFolder) {
+    return {
+      badge: "Ready with Google account",
+      summary:
+        "Completed runs will create Google Docs directly in the connected user’s Drive folder.",
+      nextStep:
+        "Open any completed run from results or history and use Deliver to Google Docs.",
+      technical: "USER_OAUTH",
+    };
+  }
+
+  if (input.activeMode === "SERVICE_ACCOUNT" && input.hasFolder) {
+    return {
+      badge: "Ready with service account",
+      summary:
+        "Completed runs will be delivered through the workspace service account configuration.",
+      nextStep:
+        "Use this mode for shared-folder delivery while My Drive OAuth rollout is still in progress.",
+      technical: "SERVICE_ACCOUNT",
+    };
+  }
+
+  if (input.oauthConnected && !input.oauthRefreshReady) {
+    return {
+      badge: "Reconnect Google account",
+      summary:
+        "This workspace has partial Google account access, but it is missing the refresh token needed for reliable My Drive delivery.",
+      nextStep:
+        "Reconnect the Google account below, then save the My Drive folder again if needed.",
+      technical: "OAUTH_REFRESH_REQUIRED",
+    };
+  }
+
+  if (input.oauthConnected) {
+    return {
+      badge: "Google account connected",
+      summary:
+        "This workspace has Google account access, but a delivery folder still needs to be saved for My Drive delivery.",
+      nextStep:
+        "Save a folder in the My Drive section below to make Google Docs delivery available.",
+      technical: "OAUTH_CONNECTED_NO_FOLDER",
+    };
+  }
+
+  if (input.oauthReady) {
+    return {
+      badge: "Connect a Google account",
+      summary:
+        "My Drive delivery is ready to be connected for this workspace, but no Google account has been authorized yet.",
+      nextStep:
+        "Connect a Google account below, then save a Drive folder to activate delivery.",
+      technical: "OAUTH_READY",
+    };
+  }
+
+  if (input.serviceAccountReady) {
+    return {
+      badge: "Service account available",
+      summary:
+        "The legacy service-account delivery path is available, but this workspace does not have an active folder configured.",
+      nextStep:
+        "Use the shared-folder section below if you need the service-account path while OAuth rollout is still in progress.",
+      technical: "SERVICE_ACCOUNT_READY",
+    };
+  }
+
+  return {
+    badge: "Needs server setup",
+    summary:
+      "Google Docs delivery is unavailable because the server is missing both the Google OAuth app configuration and the service-account credentials used by the legacy delivery path.",
+    nextStep:
+      "Add either the Google OAuth client ID and secret for My Drive delivery, or the service-account credentials for the shared-folder fallback.",
+    technical: "SERVER_NOT_CONFIGURED",
+  };
+}
+
+export default async function SettingsPage({ params, searchParams }: PageProps) {
   const session = await requireSession();
   const { workspaceId } = await params;
+  const search = await searchParams;
   const authorization = await getWorkspaceAuthorizationForUser(workspaceId, session.user.id);
 
   if (!authorization) {
@@ -33,44 +195,45 @@ export default async function SettingsPage({ params }: PageProps) {
       provider: "GOOGLE_DOCS",
     },
   });
+  const connectionState = getGoogleDocsConnectionState(integration);
   const connectionMetadata = getGoogleDocsConnectionMetadata(integration);
+  const oauthReady = hasGoogleDocsOAuthConfig();
+  const oauthConnected = hasGoogleDocsOAuthConnection(integration);
+  const oauthRefreshReady = hasGoogleDocsOAuthRefreshToken(integration);
   const googleDocsServerReady = hasGoogleDocsServiceAccountConfig();
   const serviceAccountEmail = getGoogleDocsServiceAccountEmail();
-  const deliveryStatus = !googleDocsServerReady
-    ? {
-        badge: "Needs server setup",
-        summary:
-          "Google Docs delivery is unavailable because the server is missing the service account credentials it needs to create documents.",
-        nextStep:
-          "Add the Google service account email and private key to the server environment, then reload this page.",
-        technical: "SERVER_NOT_CONFIGURED",
-      }
-    : integration?.status === "ERROR"
+  const activeMode = connectionMetadata?.authMode ?? null;
+  const deliveryStatus = getDeliveryStatus({
+    activeMode,
+    integrationStatus: integration?.status,
+    oauthConnected,
+    oauthRefreshReady,
+    oauthReady,
+    serviceAccountReady: googleDocsServerReady,
+    hasFolder: Boolean(connectionMetadata),
+  });
+  const googleDocsNotice = getGoogleDocsNotice(search.googleDocsStatus);
+  const oauthSettingsHref = `/api/google-docs/connect?workspaceId=${workspace.id}`;
+  const oauthFolderDefaults =
+    activeMode === "USER_OAUTH"
       ? {
-          badge: "Connection needs attention",
-          summary:
-            "The workspace delivery destination could not be verified the last time settings were saved.",
-          nextStep:
-            "Check the shared folder ID and confirm the folder is shared with the delivery service account, then save the settings again.",
-          technical: "ERROR",
+          folderId: connectionMetadata?.folderId,
+          titlePrefix: connectionMetadata?.titlePrefix,
         }
-      : connectionMetadata
-        ? {
-            badge: "Ready for delivery",
-            summary:
-              "Completed runs can be delivered to the shared Google Drive folder configured for this workspace.",
-            nextStep:
-              "Open any completed run from history or results and use Deliver to Google Docs.",
-            technical: integration?.status ?? "CONNECTED",
-          }
-        : {
-            badge: "Not connected",
-            summary:
-              "Google Docs delivery is available, but this workspace does not have a shared Drive folder configured yet.",
-            nextStep:
-              "Follow the setup steps below, then save the folder ID and optional title prefix.",
-            technical: integration?.status ?? "NOT_CONNECTED",
-          };
+      : {
+          folderId: undefined,
+          titlePrefix: connectionMetadata?.titlePrefix,
+        };
+  const serviceAccountDefaults =
+    activeMode === "SERVICE_ACCOUNT"
+      ? {
+          folderId: connectionMetadata?.folderId,
+          titlePrefix: connectionMetadata?.titlePrefix,
+        }
+      : {
+          folderId: undefined,
+          titlePrefix: connectionMetadata?.titlePrefix,
+        };
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -99,13 +262,13 @@ export default async function SettingsPage({ params }: PageProps) {
       </Panel>
       <Panel className="p-7">
         <p className="section-heading">Integrations</p>
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between gap-4">
           <p className="text-lg font-medium text-[var(--ink)]">Google Docs delivery</p>
           <Badge>{deliveryStatus.badge}</Badge>
         </div>
         <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
-          Configure a shared Google Drive destination for this workspace and use it to
-          deliver completed runs as Google Docs.
+          Connect Google Docs delivery for this workspace, choose the active delivery path,
+          and save the folder that should receive finished content plans.
         </p>
         <div className="mt-5 rounded-[1.75rem] border border-[var(--line)] bg-[var(--panel-strong)] p-5">
           <p className="font-medium text-[var(--ink)]">{deliveryStatus.summary}</p>
@@ -113,100 +276,160 @@ export default async function SettingsPage({ params }: PageProps) {
             {deliveryStatus.nextStep}
           </p>
           <p className="mt-3 text-xs uppercase tracking-[0.16em] text-[var(--ink-soft)]">
-            Technical status · {deliveryStatus.technical}
+            Delivery mode · {deliveryStatus.technical}
           </p>
         </div>
-        {connectionMetadata ? (
+
+        {googleDocsNotice ? (
+          <div
+            className={`mt-5 rounded-[1.75rem] border p-4 text-sm leading-7 ${
+              googleDocsNotice.tone === "success"
+                ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
+                : "border-[var(--danger)]/25 bg-[var(--danger)]/5 text-[var(--danger)]"
+            }`}
+          >
+            {googleDocsNotice.message}
+          </div>
+        ) : null}
+
+        <div className="mt-5 grid gap-5">
+          <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium text-[var(--ink)]">
+                  My Drive delivery via Google account
+                </p>
+                <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
+                  Recommended for My Drive folders. The workspace owner connects a Google
+                  account, then the app creates Google Docs directly inside that user’s
+                  chosen folder.
+                </p>
+              </div>
+              {activeMode === "USER_OAUTH" && connectionMetadata ? <Badge>ACTIVE</Badge> : null}
+            </div>
+            <div className="mt-4 rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4 text-sm text-[var(--ink-soft)]">
+                <p className="font-medium text-[var(--ink)]">
+                {oauthConnected
+                  ? oauthRefreshReady
+                    ? "Google account access is connected."
+                    : "Reconnect the Google account to finish setup."
+                  : "Google account is not connected yet."}
+              </p>
+              <p className="mt-2 leading-7">
+                {oauthConnected
+                  ? oauthRefreshReady
+                    ? "After a folder is saved below, completed runs will use the connected Google account to create documents in that Drive location."
+                    : "The current Google connection is missing the refresh token needed for durable delivery. Reconnect the account before saving or delivering to My Drive."
+                  : "Connect a Google account first, then save the folder ID you want to receive delivered documents."}
+              </p>
+              {authorization.isOwner ? (
+                oauthReady ? (
+                  <Link
+                    className="mt-4 inline-flex h-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-strong)] px-5 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--panel-muted)]"
+                    href={oauthSettingsHref}
+                  >
+                    {oauthConnected ? "Reconnect Google account" : "Connect Google account"}
+                  </Link>
+                ) : (
+                  <p className="mt-4 text-sm leading-7">
+                    Google OAuth is not configured on the server yet. Add
+                    `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` before
+                    using My Drive delivery.
+                  </p>
+                )
+              ) : (
+                <p className="mt-4 text-sm leading-7">
+                  Only workspace owners can connect a Google account for delivery.
+                </p>
+              )}
+            </div>
+            <div className="mt-4">
+              {authorization.isOwner ? (
+                <GoogleDocsSettingsForm
+                  authMode="USER_OAUTH"
+                  initialFolderId={oauthFolderDefaults.folderId}
+                  initialTitlePrefix={oauthFolderDefaults.titlePrefix}
+                  modeReady={oauthReady}
+                  oauthConnected={oauthConnected}
+                  workspaceId={workspace.id}
+                />
+              ) : (
+                <div className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm text-[var(--ink-soft)]">
+                  Only workspace owners can change the My Drive delivery folder.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium text-[var(--ink)]">
+                  Service account delivery
+                </p>
+                <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
+                  Keep this path for the current shared-folder workflow. It remains useful
+                  for shared-drive delivery while OAuth rollout is still in progress.
+                </p>
+              </div>
+              {activeMode === "SERVICE_ACCOUNT" && connectionMetadata ? <Badge>ACTIVE</Badge> : null}
+            </div>
+            <div className="mt-4 rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4 text-sm text-[var(--ink-soft)]">
+              <p className="font-medium text-[var(--ink)]">Workspace delivery service account</p>
+              {serviceAccountEmail ? (
+                <>
+                  <p className="mt-2 leading-7">
+                    Share the target folder with this service account when you want to use the
+                    legacy shared-folder delivery path.
+                  </p>
+                  <p className="mt-3 rounded-2xl bg-white/80 px-4 py-3 font-medium text-[var(--ink)]">
+                    {serviceAccountEmail}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 leading-7">
+                  The service account email is not available in this environment because the
+                  server credentials are not configured.
+                </p>
+              )}
+            </div>
+            <div className="mt-4">
+              {authorization.isOwner ? (
+                <GoogleDocsSettingsForm
+                  authMode="SERVICE_ACCOUNT"
+                  initialFolderId={serviceAccountDefaults.folderId}
+                  initialTitlePrefix={serviceAccountDefaults.titlePrefix}
+                  modeReady={googleDocsServerReady}
+                  serviceAccountEmail={serviceAccountEmail}
+                  workspaceId={workspace.id}
+                />
+              ) : (
+                <div className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm text-[var(--ink-soft)]">
+                  Only workspace owners can change the service-account delivery folder.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {connectionState?.folderId ? (
           <div className="mt-5 rounded-[1.75rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4 text-sm text-[var(--ink-soft)]">
             <p>
-              Connected folder:
+              Active folder:
               {" "}
               <span className="font-medium text-[var(--ink)]">
-                {connectionMetadata.folderName ?? connectionMetadata.folderId}
+                {connectionState.folderName ?? connectionState.folderId}
               </span>
             </p>
             <p className="mt-2">
               Title prefix:
               {" "}
               <span className="font-medium text-[var(--ink)]">
-                {connectionMetadata.titlePrefix || "None"}
+                {connectionState.titlePrefix || "None"}
               </span>
             </p>
           </div>
         ) : null}
-        <div className="mt-5 rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-5">
-          <p className="font-medium text-[var(--ink)]">Setup steps</p>
-          <ol className="mt-4 space-y-4 text-sm leading-7 text-[var(--ink-soft)]">
-            <li>
-              1. Choose or create a shared Google Drive folder for delivered content plans.
-              This folder is where each completed run will create a Google Doc.
-            </li>
-            <li>
-              2. Copy the folder ID from the Google Drive URL. In a folder URL such as
-              {" "}
-              <span className="font-medium text-[var(--ink)]">
-                `https://drive.google.com/drive/folders/your-folder-id`
-              </span>
-              {" "}
-              the folder ID is the part after
-              {" "}
-              <span className="font-medium text-[var(--ink)]">`/folders/`</span>.
-            </li>
-            <li>
-              3. Share that folder with the workspace delivery service account shown below
-              so the app can create documents inside it.
-            </li>
-            <li>
-              4. Paste the folder ID into the form, then optionally add a document title
-              prefix. The title prefix is added to the front of each delivered Google Doc
-              title to keep exports organized across brands or clients.
-            </li>
-            <li>
-              5. After setup is saved, completed runs can be delivered from the results page.
-              The app will create a Google Doc in the shared folder and show the delivery
-              status and document link in both results and run history.
-            </li>
-          </ol>
-        </div>
-        <div className="mt-5 rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-5 text-sm text-[var(--ink-soft)]">
-          <p className="font-medium text-[var(--ink)]">Delivery service account</p>
-          {serviceAccountEmail ? (
-            <>
-              <p className="mt-3 leading-7">
-                Share the Google Drive folder with this email address:
-              </p>
-              <p className="mt-2 rounded-2xl bg-[var(--panel-strong)] px-4 py-3 font-medium text-[var(--ink)]">
-                {serviceAccountEmail}
-              </p>
-              <p className="mt-3 leading-7">
-                The server also needs the matching private key configured. If delivery still
-                shows as unavailable after sharing the folder, verify the service account
-                private key is set in the server environment.
-              </p>
-            </>
-          ) : (
-            <p className="mt-3 leading-7">
-              The service account email is not available in this environment. That usually
-              means the server is missing the Google Docs delivery service account email and
-              private key configuration.
-            </p>
-          )}
-        </div>
-        <div className="mt-6">
-          {authorization.isOwner ? (
-            <GoogleDocsSettingsForm
-              initialFolderId={connectionMetadata?.folderId}
-              initialTitlePrefix={connectionMetadata?.titlePrefix}
-              serverReady={googleDocsServerReady}
-              serviceAccountEmail={serviceAccountEmail}
-              workspaceId={workspace.id}
-            />
-          ) : (
-            <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
-              Only workspace owners can change Google Docs delivery settings.
-            </div>
-          )}
-        </div>
       </Panel>
     </div>
   );
