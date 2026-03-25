@@ -6,6 +6,7 @@ import {
   type ResultsSectionCopy,
   type ResultsSectionKey,
 } from "@/lib/results/format";
+import { SectionRefinementPanel } from "@/components/results/section-refinement-panel";
 import { cn } from "@/lib/utils";
 import { CopyTextButton } from "@/components/results/copy-text-button";
 
@@ -35,9 +36,13 @@ function SectionHeader({
 export function ResultsTabs({
   output,
   copySections,
+  runId,
+  workspaceId,
 }: {
   output: FormattedStructuredOutput;
   copySections: Record<ResultsSectionKey, ResultsSectionCopy>;
+  runId: string;
+  workspaceId: string;
 }) {
   const [active, setActive] = useState<ResultsSectionKey>("overview");
   const tabListId = useId();
@@ -87,6 +92,19 @@ export function ResultsTabs({
               copyText={copySections.overview.copyText}
               title="Campaign summary"
             />
+            <div className="mt-4">
+              <SectionRefinementPanel
+                currentContent={output.campaignSummary}
+                renderProposalPreview={(proposal) => (
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                    {proposal}
+                  </p>
+                )}
+                runId={runId}
+                sectionKey="campaignSummary"
+                workspaceId={workspaceId}
+              />
+            </div>
             <p className="mt-4 whitespace-pre-wrap text-base leading-8 text-[var(--ink)]">
               {output.campaignSummary}
             </p>
@@ -126,6 +144,32 @@ export function ResultsTabs({
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
                 Sample caption copy for reuse, editing, or export.
               </p>
+              <div className="mt-4">
+                <SectionRefinementPanel
+                  currentContent={output.captions}
+                  renderProposalPreview={(proposal) => (
+                    <div className="space-y-3">
+                      {proposal.map((caption, index) => (
+                        <article
+                          className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
+                          key={`${caption.headline}-${index}`}
+                        >
+                          <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+                            {caption.platform}
+                          </p>
+                          <p className="mt-2 font-medium text-[var(--ink)]">{caption.headline}</p>
+                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink-soft)]">
+                            {caption.body}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                  runId={runId}
+                  sectionKey="captions"
+                  workspaceId={workspaceId}
+                />
+              </div>
             </div>
             {output.captions.map((caption, index) => (
               <article
@@ -151,6 +195,29 @@ export function ResultsTabs({
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
                 Platform-specific hashtag groupings from the saved run.
               </p>
+              <div className="mt-4">
+                <SectionRefinementPanel
+                  currentContent={output.hashtags}
+                  renderProposalPreview={(proposal) => (
+                    <div className="space-y-3">
+                      {proposal.map((item) => (
+                        <article
+                          className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
+                          key={item.platform}
+                        >
+                          <p className="font-medium text-[var(--ink)]">{item.platform}</p>
+                          <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
+                            {item.tags.join(" ")}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                  runId={runId}
+                  sectionKey="hashtags"
+                  workspaceId={workspaceId}
+                />
+              </div>
             </div>
             {output.hashtags.map((item) => (
               <article
@@ -176,6 +243,31 @@ export function ResultsTabs({
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
                 Prompt-ready visual directions paired to the current run.
               </p>
+              <div className="mt-4">
+                <SectionRefinementPanel
+                  currentContent={output.imagePrompts}
+                  renderProposalPreview={(proposal) => (
+                    <div className="space-y-3">
+                      {proposal.map((item, index) => (
+                        <article
+                          className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
+                          key={`${item.assetType}-${index}`}
+                        >
+                          <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+                            {item.assetType}
+                          </p>
+                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                            {item.prompt}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                  runId={runId}
+                  sectionKey="imagePrompts"
+                  workspaceId={workspaceId}
+                />
+              </div>
             </div>
             {output.imagePrompts.map((item, index) => (
               <article

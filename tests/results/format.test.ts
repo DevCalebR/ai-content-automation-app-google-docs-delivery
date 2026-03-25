@@ -60,4 +60,48 @@ describe("buildRunExportContent", () => {
       "body",
     ]);
   });
+
+  it("uses the latest saved section content in exports after a refinement is accepted", () => {
+    const exportContent = buildRunExportContent({
+      businessName: "North Star Media",
+      createdAt: new Date("2026-03-22T12:00:00.000Z"),
+      model: "gpt-5.4-mini",
+      output: {
+        campaignSummary: "Refined summary for a more operator-focused angle.",
+        calendarEntries: [
+          {
+            day: "Monday",
+            platform: "LinkedIn",
+            angle: "Client win spotlight",
+            callToAction: "Book a strategy call",
+          },
+        ],
+        captions: [
+          {
+            platform: "LinkedIn",
+            headline: "Refined headline",
+            body: "Refined caption body for the accepted revision.",
+          },
+        ],
+        hashtags: [
+          {
+            platform: "LinkedIn",
+            tags: ["#contentops", "#b2bmarketing", "#leadgen"],
+          },
+        ],
+        imagePrompts: [
+          {
+            assetType: "Static post",
+            prompt: "Refined image prompt for the accepted revision.",
+          },
+        ],
+      },
+    });
+
+    expect(exportContent.plainText).toContain(
+      "Refined summary for a more operator-focused angle.",
+    );
+    expect(exportContent.markdown).toContain("Refined caption body for the accepted revision.");
+    expect(exportContent.googleDocBlocks.some((block) => block.text.includes("Refined image prompt"))).toBe(true);
+  });
 });

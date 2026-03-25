@@ -104,7 +104,12 @@ export default async function ResultsPage({ params }: PageProps) {
             workspaceId={workspace.id}
           />
           <Panel className="p-7">
-            <ResultsTabs copySections={exportContent!.copySections} output={exportContent!.formattedOutput} />
+            <ResultsTabs
+              copySections={exportContent!.copySections}
+              output={exportContent!.formattedOutput}
+              runId={run.id}
+              workspaceId={workspace.id}
+            />
           </Panel>
         </>
       ) : run.status !== "FAILED" ? (

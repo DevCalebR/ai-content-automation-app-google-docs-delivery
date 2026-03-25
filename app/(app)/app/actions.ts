@@ -17,6 +17,7 @@ import {
 } from "@/lib/validations/brief";
 import { assertRateLimitReady } from "@/lib/rate-limit";
 import { generateCampaignPlan } from "@/lib/ai/generate";
+import { refineRunSection } from "@/lib/ai/refine-section";
 import type { ActionState } from "@/components/ui/form-state";
 import type { GoogleDocsApiClients } from "@/lib/google-docs/client";
 import {
@@ -32,6 +33,13 @@ import {
   type GoogleDocsDeliveryState,
   type GoogleDocsSettingsState,
 } from "@/lib/google-docs/state";
+import {
+  buildStructuredOutputSectionUpdate,
+  getRefinableSectionLabel,
+  validateAcceptSectionRefinementRequest,
+  validateRefineSectionRequest,
+  type RefineSectionActionResult,
+} from "@/lib/results/refinement";
 import {
   googleDocsConnectionFormSchema,
   googleDocsDeliveryRequestSchema,
@@ -383,6 +391,150 @@ export async function generateRunAction(formData: FormData) {
   }
 
   redirect(resultsPath);
+}
+
+export async function refineRunSectionAction(
+  input: Record<string, unknown>,
+): Promise<RefineSectionActionResult> {
+  const session = await requireSession();
+  const parsed = validateRefineSectionRequest(input);
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.message,
+    };
+  }
+
+  const authorization = await getWorkspaceAuthorizationForUser(
+    parsed.data.workspaceId,
+    session.user.id,
+  );
+
+  if (!authorization) {
+    return {
+      status: "error",
+      message: "Workspace not found.",
+    };
+  }
+
+  const run = await db.generationRun.findFirst({
+    where: {
+      id: parsed.data.runId,
+      workspaceId: authorization.workspace.id,
+    },
+    include: {
+      brief: true,
+      preset: true,
+      structuredOutput: true,
+    },
+  });
+
+  if (!run?.structuredOutput) {
+    return {
+      status: "error",
+      message: "This run does not have a saved result to refine yet.",
+    };
+  }
+
+  try {
+    const revisedContent = await refineRunSection({
+      brief: run.brief,
+      currentContent: parsed.data.currentContent,
+      instruction: parsed.data.instruction,
+      model: run.model,
+      preset: run.preset,
+      sectionKey: parsed.data.sectionKey,
+      supportingOutput: run.structuredOutput,
+    });
+
+    return {
+      status: "success",
+      revisedContent,
+    };
+  } catch (error) {
+    logError(error, "section-refinement");
+
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "We couldn't refine that section right now.",
+    };
+  }
+}
+
+export async function acceptRunSectionRefinementAction(
+  input: Record<string, unknown>,
+): Promise<ActionState> {
+  const session = await requireSession();
+  const parsed = validateAcceptSectionRefinementRequest(input);
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.message,
+    };
+  }
+
+  const authorization = await getWorkspaceAuthorizationForUser(
+    parsed.data.workspaceId,
+    session.user.id,
+  );
+
+  if (!authorization) {
+    return {
+      status: "error",
+      message: "Workspace not found.",
+    };
+  }
+
+  const run = await db.generationRun.findFirst({
+    where: {
+      id: parsed.data.runId,
+      workspaceId: authorization.workspace.id,
+    },
+    include: {
+      structuredOutput: true,
+    },
+  });
+
+  if (!run?.structuredOutput) {
+    return {
+      status: "error",
+      message: "This run does not have a saved result to update yet.",
+    };
+  }
+
+  try {
+    await db.structuredOutput.update({
+      where: {
+        runId: run.id,
+      },
+      data: buildStructuredOutputSectionUpdate(
+        run.structuredOutput,
+        parsed.data.sectionKey,
+        parsed.data.revisedContent,
+      ),
+    });
+
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/results/${run.id}`);
+    revalidatePath(`/app/workspaces/${authorization.workspace.id}/history`);
+
+    return {
+      status: "success",
+      message: `${getRefinableSectionLabel(parsed.data.sectionKey)} updated.`,
+    };
+  } catch (error) {
+    logError(error, "section-refinement");
+
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "We couldn't save that section revision.",
+    };
+  }
 }
 
 export async function updateWorkspaceSettingsAction(
