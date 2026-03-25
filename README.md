@@ -50,28 +50,40 @@ npm install
 2. Copy `.env.example` into `.env` and fill in:
 
 ```env
+# Core runtime
 DATABASE_URL=
-DIRECT_DATABASE_URL=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.4-mini
 APP_URL=http://localhost:3000
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=replace-with-a-32-character-secret
+
+# Auth email flows (required if you want real sign-up / verification / reset email delivery)
 EMAIL_FROM=AI Content Automation <no-reply@example.com>
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASSWORD=
 SMTP_SECURE=false
-GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL=
-GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY=
+
+# Google OAuth / My Drive delivery (optional)
 GOOGLE_OAUTH_CLIENT_ID=
 GOOGLE_OAUTH_CLIENT_SECRET=
+
+# Legacy Google Docs service-account delivery (optional)
+GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY=
+
+# Tooling / local only
+DIRECT_DATABASE_URL=
 NODE_ENV=development
 SEED_DEMO_ACCOUNT=false
 SEED_DEMO_EMAIL=demo@example.com
 SEED_DEMO_PASSWORD=Phase1DemoPass!
 ```
+
+`DIRECT_DATABASE_URL` is only needed for Prisma workflows when your database provider
+requires a direct connection. The app runtime itself only needs `DATABASE_URL`.
 
 3. Generate the Prisma client and run migrations:
 
