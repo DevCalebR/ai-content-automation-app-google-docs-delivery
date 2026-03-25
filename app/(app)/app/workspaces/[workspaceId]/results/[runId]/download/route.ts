@@ -3,11 +3,45 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { db } from "@/lib/db";
 import { logAuditEvent } from "@/lib/logger";
-import { buildRunExportContent } from "@/lib/results/format";
+import { buildRunDocxBuffer } from "@/lib/results/docx";
+import {
+  buildRunExportContent,
+  downloadFormatSchema,
+  type DownloadFormat,
+} from "@/lib/results/format";
+import { buildRunPdfBuffer } from "@/lib/results/pdf";
 import { getWorkspaceAccessForUser } from "@/lib/workspaces/service";
 
 type RouteContext = {
   params: Promise<{ workspaceId: string; runId: string }>;
+};
+
+export const runtime = "nodejs";
+
+const exportResponseConfig: Record<
+  DownloadFormat,
+  {
+    contentType: string;
+    extension: string;
+  }
+> = {
+  markdown: {
+    contentType: "text/markdown; charset=utf-8",
+    extension: "md",
+  },
+  text: {
+    contentType: "text/plain; charset=utf-8",
+    extension: "txt",
+  },
+  docx: {
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    extension: "docx",
+  },
+  pdf: {
+    contentType: "application/pdf",
+    extension: "pdf",
+  },
 };
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
@@ -25,8 +59,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   }
 
   const format = request.nextUrl.searchParams.get("format");
+  const parsedFormat = downloadFormatSchema.safeParse(format);
 
-  if (format !== "markdown" && format !== "text") {
+  if (!parsedFormat.success) {
     return new NextResponse("Unsupported export format", { status: 400 });
   }
 
@@ -49,10 +84,19 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     businessName: run.brief.businessName,
     createdAt: run.createdAt,
     model: run.model,
+    workspaceName: workspace.name,
     output: run.structuredOutput,
   });
-  const body = format === "markdown" ? exportContent.markdown : exportContent.plainText;
-  const extension = format === "markdown" ? "md" : "txt";
+  const formatKey = parsedFormat.data;
+  const body =
+    formatKey === "markdown"
+      ? exportContent.markdown
+      : formatKey === "text"
+        ? exportContent.plainText
+        : formatKey === "docx"
+          ? await buildRunDocxBuffer(exportContent)
+          : await buildRunPdfBuffer(exportContent);
+  const responseConfig = exportResponseConfig[formatKey];
 
   await db.usageEvent.create({
     data: {
@@ -61,7 +105,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       type: "RUN_EXPORT_DOWNLOADED",
       metadata: {
         runId: run.id,
-        format,
+        format: formatKey,
       },
     },
   });
@@ -72,15 +116,16 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     workspaceId: workspace.id,
     metadata: {
       runId: run.id,
-      format,
+      format: formatKey,
     },
   });
 
-  return new NextResponse(body, {
+  const responseBody = typeof body === "string" ? body : new Uint8Array(body);
+
+  return new NextResponse(responseBody, {
     headers: {
-      "Content-Disposition": `attachment; filename="${exportContent.fileStem}.${extension}"`,
-      "Content-Type":
-        format === "markdown" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${exportContent.fileStem}.${responseConfig.extension}"`,
+      "Content-Type": responseConfig.contentType,
     },
   });
 }

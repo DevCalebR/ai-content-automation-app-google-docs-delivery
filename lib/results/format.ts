@@ -20,6 +20,10 @@ const storedStructuredOutputSchema = z.object({
   imagePrompts: z.array(imagePromptSchema),
 });
 
+export const downloadFormatSchema = z.enum(["markdown", "text", "docx", "pdf"]);
+
+export type DownloadFormat = z.infer<typeof downloadFormatSchema>;
+
 export type FormattedStructuredOutput = {
   campaignSummary: string;
   calendarEntries: CalendarEntry[];
@@ -41,51 +45,136 @@ export type ResultsSectionCopy = {
   copyText: string;
 };
 
+export type RunExportSectionItem = {
+  title: string;
+  lines: string[];
+};
+
+export type RunExportSection =
+  | {
+      key: "overview";
+      title: string;
+      kind: "paragraphs";
+      paragraphs: string[];
+    }
+  | {
+      key: Exclude<ResultsSectionKey, "overview">;
+      title: string;
+      kind: "items";
+      items: RunExportSectionItem[];
+    };
+
 export type RunExportContent = {
   fileStem: string;
   title: string;
   generatedLabel: string;
+  workspaceLabel?: string;
   formattedOutput: FormattedStructuredOutput;
+  sections: RunExportSection[];
   copySections: Record<ResultsSectionKey, ResultsSectionCopy>;
   plainText: string;
   markdown: string;
   googleDocBlocks: Array<{ kind: "title" | "subtitle" | "heading" | "body"; text: string }>;
 };
 
-function formatCalendarSection(entries: CalendarEntry[]) {
-  return entries
-    .map(
-      (entry, index) =>
-        `${index + 1}. ${entry.day} · ${entry.platform}\nAngle: ${entry.angle}\nCTA: ${entry.callToAction}`,
-    )
+function buildOverviewSection(output: FormattedStructuredOutput): RunExportSection {
+  return {
+    key: "overview",
+    title: "Campaign summary",
+    kind: "paragraphs",
+    paragraphs: [output.campaignSummary.trim()],
+  };
+}
+
+function buildCalendarSection(output: FormattedStructuredOutput): RunExportSection {
+  return {
+    key: "calendar",
+    title: "Calendar",
+    kind: "items",
+    items: output.calendarEntries.map((entry, index) => ({
+      title: `${index + 1}. ${entry.day} · ${entry.platform}`,
+      lines: [`Angle: ${entry.angle}`, `CTA: ${entry.callToAction}`],
+    })),
+  };
+}
+
+function buildCaptionsSection(output: FormattedStructuredOutput): RunExportSection {
+  return {
+    key: "captions",
+    title: "Captions",
+    kind: "items",
+    items: output.captions.map((caption, index) => ({
+      title: `${index + 1}. ${caption.platform} · ${caption.headline}`,
+      lines: [caption.body],
+    })),
+  };
+}
+
+function buildHashtagsSection(output: FormattedStructuredOutput): RunExportSection {
+  return {
+    key: "hashtags",
+    title: "Hashtags",
+    kind: "items",
+    items: output.hashtags.map((set) => ({
+      title: set.platform,
+      lines: [set.tags.join(" ")],
+    })),
+  };
+}
+
+function buildImagePromptsSection(output: FormattedStructuredOutput): RunExportSection {
+  return {
+    key: "imagePrompts",
+    title: "Image prompts",
+    kind: "items",
+    items: output.imagePrompts.map((prompt, index) => ({
+      title: `${index + 1}. ${prompt.assetType}`,
+      lines: [prompt.prompt],
+    })),
+  };
+}
+
+function renderSectionPlainText(section: RunExportSection) {
+  if (section.kind === "paragraphs") {
+    return section.paragraphs.join("\n\n");
+  }
+
+  return section.items
+    .map((item) => [item.title, ...item.lines].join("\n"))
     .join("\n\n");
 }
 
-function formatCaptionsSection(captions: Caption[]) {
-  return captions
-    .map(
-      (caption, index) =>
-        `${index + 1}. ${caption.platform} · ${caption.headline}\n${caption.body}`,
-    )
-    .join("\n\n");
+function renderSectionMarkdown(section: RunExportSection) {
+  if (section.kind === "paragraphs") {
+    return section.paragraphs.flatMap((paragraph) => [paragraph, ""]);
+  }
+
+  return section.items.flatMap((item) => [
+    `### ${item.title}`,
+    "",
+    ...item.lines,
+    "",
+  ]);
 }
 
-function formatHashtagsSection(hashtags: HashtagSet[]) {
-  return hashtags
-    .map((set) => `${set.platform}\n${set.tags.join(" ")}`)
-    .join("\n\n");
+function buildCopySections(sections: RunExportSection[]) {
+  return sections.reduce<Record<ResultsSectionKey, ResultsSectionCopy>>((accumulator, section) => {
+    accumulator[section.key] = {
+      key: section.key,
+      label: section.title,
+      copyText: `${section.title}\n\n${renderSectionPlainText(section)}`,
+    };
+
+    return accumulator;
+  }, {} as Record<ResultsSectionKey, ResultsSectionCopy>);
 }
 
-function formatImagePromptsSection(imagePrompts: ImagePrompt[]) {
-  return imagePrompts
-    .map((prompt, index) => `${index + 1}. ${prompt.assetType}\n${prompt.prompt}`)
-    .join("\n\n");
-}
-
-export function parseStructuredOutputRecord(output: Pick<
-  StructuredOutput,
-  "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
->): FormattedStructuredOutput {
+export function parseStructuredOutputRecord(
+  output: Pick<
+    StructuredOutput,
+    "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
+  >,
+): FormattedStructuredOutput {
   return storedStructuredOutputSchema.parse({
     campaignSummary: output.campaignSummary,
     calendarEntries: output.calendarEntries,
@@ -99,105 +188,42 @@ export function buildRunExportContent(input: {
   businessName: string;
   createdAt: Date;
   model: string;
+  workspaceName?: string;
   output: Pick<
     StructuredOutput,
     "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
   >;
-}) : RunExportContent {
+}): RunExportContent {
   const formattedOutput = parseStructuredOutputRecord(input.output);
   const title = `${input.businessName} content plan`;
   const generatedLabel = `Generated ${formatShortDate(input.createdAt)} with ${input.model}`;
-  const overviewText = formattedOutput.campaignSummary.trim();
-  const calendarText = formatCalendarSection(formattedOutput.calendarEntries);
-  const captionsText = formatCaptionsSection(formattedOutput.captions);
-  const hashtagsText = formatHashtagsSection(formattedOutput.hashtags);
-  const imagePromptsText = formatImagePromptsSection(formattedOutput.imagePrompts);
-
-  const copySections: Record<ResultsSectionKey, ResultsSectionCopy> = {
-    overview: {
-      key: "overview",
-      label: "Campaign summary",
-      copyText: `Campaign summary\n\n${overviewText}`,
-    },
-    calendar: {
-      key: "calendar",
-      label: "Calendar",
-      copyText: `Calendar\n\n${calendarText}`,
-    },
-    captions: {
-      key: "captions",
-      label: "Captions",
-      copyText: `Captions\n\n${captionsText}`,
-    },
-    hashtags: {
-      key: "hashtags",
-      label: "Hashtags",
-      copyText: `Hashtags\n\n${hashtagsText}`,
-    },
-    imagePrompts: {
-      key: "imagePrompts",
-      label: "Image prompts",
-      copyText: `Image prompts\n\n${imagePromptsText}`,
-    },
-  };
+  const workspaceLabel = input.workspaceName ? `Workspace: ${input.workspaceName}` : undefined;
+  const sections: RunExportSection[] = [
+    buildOverviewSection(formattedOutput),
+    buildCalendarSection(formattedOutput),
+    buildCaptionsSection(formattedOutput),
+    buildHashtagsSection(formattedOutput),
+    buildImagePromptsSection(formattedOutput),
+  ];
+  const copySections = buildCopySections(sections);
 
   const plainText = [
     title,
+    ...(workspaceLabel ? [workspaceLabel] : []),
     generatedLabel,
     "",
-    copySections.overview.copyText,
-    "",
-    copySections.calendar.copyText,
-    "",
-    copySections.captions.copyText,
-    "",
-    copySections.hashtags.copyText,
-    "",
-    copySections.imagePrompts.copyText,
-  ].join("\n");
+    ...sections.flatMap((section) => [section.title, "", renderSectionPlainText(section), ""]),
+  ]
+    .join("\n")
+    .trim();
 
   const markdown = [
     `# ${title}`,
     "",
+    ...(workspaceLabel ? [workspaceLabel, ""] : []),
     generatedLabel,
     "",
-    "## Campaign summary",
-    "",
-    overviewText,
-    "",
-    "## Calendar",
-    "",
-    ...formattedOutput.calendarEntries.flatMap((entry, index) => [
-      `### ${index + 1}. ${entry.day} · ${entry.platform}`,
-      "",
-      `- Angle: ${entry.angle}`,
-      `- CTA: ${entry.callToAction}`,
-      "",
-    ]),
-    "## Captions",
-    "",
-    ...formattedOutput.captions.flatMap((caption, index) => [
-      `### ${index + 1}. ${caption.platform} · ${caption.headline}`,
-      "",
-      caption.body,
-      "",
-    ]),
-    "## Hashtags",
-    "",
-    ...formattedOutput.hashtags.flatMap((set) => [
-      `### ${set.platform}`,
-      "",
-      set.tags.join(" "),
-      "",
-    ]),
-    "## Image prompts",
-    "",
-    ...formattedOutput.imagePrompts.flatMap((prompt, index) => [
-      `### ${index + 1}. ${prompt.assetType}`,
-      "",
-      prompt.prompt,
-      "",
-    ]),
+    ...sections.flatMap((section) => [`## ${section.title}`, "", ...renderSectionMarkdown(section)]),
   ]
     .join("\n")
     .trim();
@@ -207,57 +233,37 @@ export function buildRunExportContent(input: {
       kind: "title",
       text: title,
     },
+    ...(workspaceLabel
+      ? [
+          {
+            kind: "subtitle" as const,
+            text: workspaceLabel,
+          },
+        ]
+      : []),
     {
       kind: "subtitle",
       text: generatedLabel,
     },
-    {
-      kind: "heading",
-      text: "Campaign summary",
-    },
-    {
-      kind: "body",
-      text: overviewText,
-    },
-    {
-      kind: "heading",
-      text: "Calendar",
-    },
-    {
-      kind: "body",
-      text: calendarText,
-    },
-    {
-      kind: "heading",
-      text: "Captions",
-    },
-    {
-      kind: "body",
-      text: captionsText,
-    },
-    {
-      kind: "heading",
-      text: "Hashtags",
-    },
-    {
-      kind: "body",
-      text: hashtagsText,
-    },
-    {
-      kind: "heading",
-      text: "Image prompts",
-    },
-    {
-      kind: "body",
-      text: imagePromptsText,
-    },
+    ...sections.flatMap((section) => [
+      {
+        kind: "heading" as const,
+        text: section.title,
+      },
+      {
+        kind: "body" as const,
+        text: renderSectionPlainText(section),
+      },
+    ]),
   ];
 
   return {
     fileStem: `${slugify(input.businessName) || "content-plan"}-${input.createdAt.toISOString().slice(0, 10)}`,
     title,
     generatedLabel,
+    workspaceLabel,
     formattedOutput,
+    sections,
     copySections,
     plainText,
     markdown,

@@ -11,19 +11,27 @@ import { Button } from "@/components/ui/button";
 import { FormStateMessage } from "@/components/ui/form-state";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { initialGoogleDocsDeliveryState } from "@/lib/google-docs/state";
+import { cn } from "@/lib/utils";
 
 function DownloadAction({
   href,
-  label,
   icon,
+  label,
+  priority = "secondary",
 }: {
   href: string;
-  label: string;
   icon: ReactNode;
+  label: string;
+  priority?: "primary" | "secondary";
 }) {
   return (
     <a
-      className="inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-strong)] px-4 text-xs font-medium text-[var(--ink)] transition hover:bg-[var(--panel-muted)]"
+      className={cn(
+        "inline-flex items-center justify-center rounded-full border font-medium transition",
+        priority === "primary"
+          ? "h-11 border-[var(--line)] bg-[var(--ink)] px-5 text-sm text-[var(--surface-strong)] hover:bg-[#332b25]"
+          : "h-9 border-[var(--line)] bg-[var(--panel-strong)] px-4 text-xs text-[var(--ink)] hover:bg-[var(--panel-muted)]",
+      )}
       href={href}
     >
       <span className="mr-2">{icon}</span>
@@ -34,6 +42,8 @@ function DownloadAction({
 
 export function RunResultsToolbar({
   copyAllText,
+  docxDownloadUrl,
+  pdfDownloadUrl,
   markdownDownloadUrl,
   textDownloadUrl,
   workspaceId,
@@ -45,6 +55,8 @@ export function RunResultsToolbar({
   latestDelivery,
 }: {
   copyAllText: string;
+  docxDownloadUrl: string;
+  pdfDownloadUrl: string;
   markdownDownloadUrl: string;
   textDownloadUrl: string;
   workspaceId: string;
@@ -75,26 +87,51 @@ export function RunResultsToolbar({
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_360px]">
       <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-[var(--ink)]">Export and reuse</p>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              Copy the full run or download a stable export generated from the saved result.
-            </p>
-          </div>
-          <CopyTextButton label="Copied all results." text={copyAllText} />
+        <div>
+          <p className="text-sm font-medium text-[var(--ink)]">Export and reuse</p>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]">
+            Download a polished client-ready export or copy the full saved run.
+          </p>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <DownloadAction
-            href={markdownDownloadUrl}
-            icon={<FileDown className="h-4 w-4" />}
-            label="Download markdown"
+            href={docxDownloadUrl}
+            icon={<FileText className="h-4 w-4" />}
+            label="Download DOCX"
+            priority="primary"
           />
           <DownloadAction
-            href={textDownloadUrl}
-            icon={<FileText className="h-4 w-4" />}
-            label="Download plain text"
+            href={pdfDownloadUrl}
+            icon={<FileDown className="h-4 w-4" />}
+            label="Download PDF"
+            priority="primary"
           />
+          <CopyTextButton
+            label="Copied all results."
+            size="default"
+            text={copyAllText}
+            variant="secondary"
+          />
+        </div>
+        <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[var(--panel-strong)] p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+            Advanced exports
+          </p>
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            Keep markdown or plain text handy for technical workflows.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <DownloadAction
+              href={markdownDownloadUrl}
+              icon={<FileDown className="h-4 w-4" />}
+              label="Download markdown"
+            />
+            <DownloadAction
+              href={textDownloadUrl}
+              icon={<FileText className="h-4 w-4" />}
+              label="Download plain text"
+            />
+          </div>
         </div>
       </div>
 

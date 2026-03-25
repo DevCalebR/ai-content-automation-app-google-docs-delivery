@@ -47,6 +47,7 @@ export default async function ResultsPage({ params }: PageProps) {
         businessName: run.brief.businessName,
         createdAt: run.createdAt,
         model: run.model,
+        workspaceName: workspace.name,
         output: run.structuredOutput,
       })
     : null;
@@ -93,11 +94,13 @@ export default async function ResultsPage({ params }: PageProps) {
         <>
           <RunResultsToolbar
             copyAllText={exportContent!.plainText}
+            docxDownloadUrl={`${downloadBasePath}?format=docx`}
             googleDocsConnected={Boolean(googleDocsMetadata)}
             googleDocsServerReady={hasGoogleDocsServiceAccountConfig()}
             isOwner={authorization.isOwner}
             latestDelivery={googleDocsDelivery}
             markdownDownloadUrl={`${downloadBasePath}?format=markdown`}
+            pdfDownloadUrl={`${downloadBasePath}?format=pdf`}
             runId={run.id}
             settingsHref={`/app/workspaces/${workspace.id}/settings`}
             textDownloadUrl={`${downloadBasePath}?format=text`}
