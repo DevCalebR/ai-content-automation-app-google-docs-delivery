@@ -55,9 +55,9 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/workspaces/service", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/workspaces/service")>(
-    "@/lib/workspaces/service",
-  );
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspaces/service")
+  >("@/lib/workspaces/service");
 
   return {
     ...actual,
@@ -84,11 +84,13 @@ vi.mock("@/lib/google-docs/oauth", () => ({
 }));
 
 vi.mock("@/lib/google-docs/service", () => ({
-  isGoogleDocsDeliveryError: (error: unknown) => error instanceof MockGoogleDocsDeliveryError,
+  isGoogleDocsDeliveryError: (error: unknown) =>
+    error instanceof MockGoogleDocsDeliveryError,
 }));
 
 vi.mock("@/lib/logger", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger");
+  const actual =
+    await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger");
 
   return {
     ...actual,
@@ -146,6 +148,7 @@ describe("deliverRunToGoogleDocsAction", () => {
     getWorkspaceAuthorizationForUserMock.mockResolvedValue({
       workspace: {
         id: "workspace-1",
+        name: "Client Delivery",
       },
       isOwner: true,
       membership: {
@@ -212,14 +215,24 @@ describe("deliverRunToGoogleDocsAction", () => {
       url: "https://docs.google.com/document/d/doc-1/edit",
     });
 
-    const { deliverRunToGoogleDocsAction } = await import("@/app/(app)/app/actions");
-    const { initialGoogleDocsDeliveryState } = await import("@/lib/google-docs/state");
+    const { deliverRunToGoogleDocsAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsDeliveryState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("runId", "run-1");
 
-    const result = await deliverRunToGoogleDocsAction(initialGoogleDocsDeliveryState, formData);
+    const result = await deliverRunToGoogleDocsAction(
+      initialGoogleDocsDeliveryState,
+      formData,
+    );
 
+    expect(deliverStructuredOutputToGoogleDocsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceName: "Client Delivery",
+      }),
+    );
     expect(runDeliveryUpsertMock).toHaveBeenCalled();
     expect(runDeliveryUpdateMock).toHaveBeenCalledWith({
       where: {
@@ -300,13 +313,18 @@ describe("deliverRunToGoogleDocsAction", () => {
       url: "https://docs.google.com/document/d/doc-2/edit",
     });
 
-    const { deliverRunToGoogleDocsAction } = await import("@/app/(app)/app/actions");
-    const { initialGoogleDocsDeliveryState } = await import("@/lib/google-docs/state");
+    const { deliverRunToGoogleDocsAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsDeliveryState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("runId", "run-1");
 
-    const result = await deliverRunToGoogleDocsAction(initialGoogleDocsDeliveryState, formData);
+    const result = await deliverRunToGoogleDocsAction(
+      initialGoogleDocsDeliveryState,
+      formData,
+    );
 
     expect(getStoredGoogleOAuthTokensMock).toHaveBeenCalledWith({
       status: "CONNECTED",
@@ -390,13 +408,18 @@ describe("deliverRunToGoogleDocsAction", () => {
       },
     });
 
-    const { deliverRunToGoogleDocsAction } = await import("@/app/(app)/app/actions");
-    const { initialGoogleDocsDeliveryState } = await import("@/lib/google-docs/state");
+    const { deliverRunToGoogleDocsAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsDeliveryState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("runId", "run-1");
 
-    const result = await deliverRunToGoogleDocsAction(initialGoogleDocsDeliveryState, formData);
+    const result = await deliverRunToGoogleDocsAction(
+      initialGoogleDocsDeliveryState,
+      formData,
+    );
 
     expect(integrationConnectionUpdateMock).toHaveBeenCalledWith({
       where: {
@@ -412,7 +435,59 @@ describe("deliverRunToGoogleDocsAction", () => {
     expect(result).toEqual({
       status: "error",
       message:
-          "Reconnect the Google account for this workspace before delivering to My Drive.",
+        "Reconnect the Google account for this workspace before delivering to My Drive.",
+    });
+  });
+
+  it("returns a safe message when the saved run output cannot be prepared for delivery", async () => {
+    const { RunExportContentError } = await import("@/lib/results/format");
+    deliverStructuredOutputToGoogleDocsMock.mockRejectedValue(
+      new RunExportContentError(
+        "MALFORMED_OUTPUT",
+        "Saved run output is malformed.",
+      ),
+    );
+
+    const { deliverRunToGoogleDocsAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsDeliveryState } =
+      await import("@/lib/google-docs/state");
+    const formData = new FormData();
+    formData.set("workspaceId", "workspace-1");
+    formData.set("runId", "run-1");
+
+    const result = await deliverRunToGoogleDocsAction(
+      initialGoogleDocsDeliveryState,
+      formData,
+    );
+
+    expect(runDeliveryUpdateMock).toHaveBeenCalledWith({
+      where: {
+        runId_provider: {
+          runId: "run-1",
+          provider: "GOOGLE_DOCS",
+        },
+      },
+      data: {
+        status: "FAILED",
+        errorMessage:
+          "This saved run result couldn't be prepared for Google Docs delivery. Regenerate the run or contact support.",
+      },
+    });
+    expect(logAuditEventMock).toHaveBeenCalledWith({
+      action: "google_docs.delivery.failed",
+      userId: "user-1",
+      workspaceId: "workspace-1",
+      metadata: {
+        runId: "run-1",
+        stage: "export_content",
+        kind: "content",
+      },
+    });
+    expect(result).toEqual({
+      status: "error",
+      message:
+        "This saved run result couldn't be prepared for Google Docs delivery. Regenerate the run or contact support.",
     });
   });
 
@@ -424,19 +499,25 @@ describe("deliverRunToGoogleDocsAction", () => {
         "permission",
         {
           status: 403,
-          apiMessage: "The user does not have sufficient permissions for this file.",
+          apiMessage:
+            "The user does not have sufficient permissions for this file.",
           apiReason: "insufficientFilePermissions",
         },
       ),
     );
 
-    const { deliverRunToGoogleDocsAction } = await import("@/app/(app)/app/actions");
-    const { initialGoogleDocsDeliveryState } = await import("@/lib/google-docs/state");
+    const { deliverRunToGoogleDocsAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsDeliveryState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("runId", "run-1");
 
-    const result = await deliverRunToGoogleDocsAction(initialGoogleDocsDeliveryState, formData);
+    const result = await deliverRunToGoogleDocsAction(
+      initialGoogleDocsDeliveryState,
+      formData,
+    );
 
     expect(logErrorMock).toHaveBeenCalledWith(
       {
@@ -447,7 +528,8 @@ describe("deliverRunToGoogleDocsAction", () => {
         kind: "permission",
         details: {
           status: 403,
-          apiMessage: "The user does not have sufficient permissions for this file.",
+          apiMessage:
+            "The user does not have sufficient permissions for this file.",
           apiReason: "insufficientFilePermissions",
         },
         runId: "run-1",
@@ -509,13 +591,18 @@ describe("deliverRunToGoogleDocsAction", () => {
       ),
     );
 
-    const { deliverRunToGoogleDocsAction } = await import("@/app/(app)/app/actions");
-    const { initialGoogleDocsDeliveryState } = await import("@/lib/google-docs/state");
+    const { deliverRunToGoogleDocsAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsDeliveryState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("runId", "run-1");
 
-    const result = await deliverRunToGoogleDocsAction(initialGoogleDocsDeliveryState, formData);
+    const result = await deliverRunToGoogleDocsAction(
+      initialGoogleDocsDeliveryState,
+      formData,
+    );
 
     expect(logErrorMock).toHaveBeenCalledWith(
       {

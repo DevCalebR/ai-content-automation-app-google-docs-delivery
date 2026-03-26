@@ -1,10 +1,6 @@
 import type { StructuredOutput } from "@prisma/client";
 import { z } from "zod";
 import {
-  calendarEntrySchema,
-  captionSchema,
-  hashtagSetSchema,
-  imagePromptSchema,
   type CalendarEntry,
   type Caption,
   type HashtagSet,
@@ -12,13 +8,36 @@ import {
 } from "@/lib/validations/generation";
 import { formatShortDate, slugify } from "@/lib/utils";
 
-const storedStructuredOutputSchema = z.object({
-  campaignSummary: z.string().min(1),
-  calendarEntries: z.array(calendarEntrySchema),
-  captions: z.array(captionSchema),
-  hashtags: z.array(hashtagSetSchema),
-  imagePrompts: z.array(imagePromptSchema),
+const exportTextSchema = z.string().trim().min(1);
+const exportCalendarEntrySchema = z.object({
+  day: exportTextSchema,
+  platform: exportTextSchema,
+  angle: exportTextSchema,
+  callToAction: exportTextSchema,
 });
+const exportCaptionSchema = z.object({
+  platform: exportTextSchema,
+  headline: exportTextSchema,
+  body: exportTextSchema,
+});
+const exportHashtagSetSchema = z.object({
+  platform: exportTextSchema,
+  tags: z.array(exportTextSchema).min(1).max(10),
+});
+const exportImagePromptSchema = z.object({
+  assetType: exportTextSchema,
+  prompt: exportTextSchema,
+});
+
+export class RunExportContentError extends Error {
+  readonly code: "EMPTY_OUTPUT" | "MALFORMED_OUTPUT";
+
+  constructor(code: "EMPTY_OUTPUT" | "MALFORMED_OUTPUT", message: string) {
+    super(message);
+    this.name = "RunExportContentError";
+    this.code = code;
+  }
+}
 
 export const downloadFormatSchema = z.enum(["markdown", "text", "docx", "pdf"]);
 
@@ -74,22 +93,119 @@ export type RunExportContent = {
   copySections: Record<ResultsSectionKey, ResultsSectionCopy>;
   plainText: string;
   markdown: string;
-  googleDocBlocks: Array<{ kind: "title" | "subtitle" | "heading" | "body"; text: string }>;
+  googleDocBlocks: Array<{
+    kind: "title" | "subtitle" | "heading" | "body";
+    text: string;
+  }>;
 };
 
-function buildOverviewSection(output: FormattedStructuredOutput): RunExportSection {
+type StoredOutputRecord = Pick<
+  StructuredOutput,
+  | "campaignSummary"
+  | "calendarEntries"
+  | "captions"
+  | "hashtags"
+  | "imagePrompts"
+>;
+
+type StructuredOutputNormalizationResult = {
+  formattedOutput: FormattedStructuredOutput;
+  hadInvalidData: boolean;
+};
+
+const sectionLabels: Record<ResultsSectionKey, string> = {
+  overview: "Campaign summary",
+  calendar: "Calendar",
+  captions: "Captions",
+  hashtags: "Hashtags",
+  imagePrompts: "Image prompts",
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeStringField(value: unknown) {
+  if (typeof value !== "string") {
+    return {
+      value: "",
+      hadInvalidData: true,
+    };
+  }
+
+  return {
+    value: value.trim(),
+    hadInvalidData: false,
+  };
+}
+
+function normalizeArrayField<T>(value: unknown, schema: z.ZodType<T>) {
+  if (!Array.isArray(value)) {
+    return {
+      value: [] as T[],
+      hadInvalidData: true,
+    };
+  }
+
+  let hadInvalidData = false;
+  const normalizedItems: T[] = [];
+
+  for (const item of value) {
+    const parsed = schema.safeParse(item);
+
+    if (parsed.success) {
+      normalizedItems.push(parsed.data);
+    } else {
+      hadInvalidData = true;
+    }
+  }
+
+  return {
+    value: normalizedItems,
+    hadInvalidData,
+  };
+}
+
+function createCopySection(
+  key: ResultsSectionKey,
+  section: RunExportSection | null,
+): ResultsSectionCopy {
+  const label = sectionLabels[key];
+
+  return {
+    key,
+    label,
+    copyText: section
+      ? `${label}\n\n${renderSectionPlainText(section)}`
+      : `${label}\n\nNo saved content is available in this section.`,
+  };
+}
+
+function buildOverviewSection(
+  output: FormattedStructuredOutput,
+): RunExportSection | null {
+  if (!output.campaignSummary.trim()) {
+    return null;
+  }
+
   return {
     key: "overview",
-    title: "Campaign summary",
+    title: sectionLabels.overview,
     kind: "paragraphs",
     paragraphs: [output.campaignSummary.trim()],
   };
 }
 
-function buildCalendarSection(output: FormattedStructuredOutput): RunExportSection {
+function buildCalendarSection(
+  output: FormattedStructuredOutput,
+): RunExportSection | null {
+  if (!output.calendarEntries.length) {
+    return null;
+  }
+
   return {
     key: "calendar",
-    title: "Calendar",
+    title: sectionLabels.calendar,
     kind: "items",
     items: output.calendarEntries.map((entry, index) => ({
       title: `${index + 1}. ${entry.day} · ${entry.platform}`,
@@ -98,10 +214,16 @@ function buildCalendarSection(output: FormattedStructuredOutput): RunExportSecti
   };
 }
 
-function buildCaptionsSection(output: FormattedStructuredOutput): RunExportSection {
+function buildCaptionsSection(
+  output: FormattedStructuredOutput,
+): RunExportSection | null {
+  if (!output.captions.length) {
+    return null;
+  }
+
   return {
     key: "captions",
-    title: "Captions",
+    title: sectionLabels.captions,
     kind: "items",
     items: output.captions.map((caption, index) => ({
       title: `${index + 1}. ${caption.platform} · ${caption.headline}`,
@@ -110,10 +232,16 @@ function buildCaptionsSection(output: FormattedStructuredOutput): RunExportSecti
   };
 }
 
-function buildHashtagsSection(output: FormattedStructuredOutput): RunExportSection {
+function buildHashtagsSection(
+  output: FormattedStructuredOutput,
+): RunExportSection | null {
+  if (!output.hashtags.length) {
+    return null;
+  }
+
   return {
     key: "hashtags",
-    title: "Hashtags",
+    title: sectionLabels.hashtags,
     kind: "items",
     items: output.hashtags.map((set) => ({
       title: set.platform,
@@ -122,10 +250,16 @@ function buildHashtagsSection(output: FormattedStructuredOutput): RunExportSecti
   };
 }
 
-function buildImagePromptsSection(output: FormattedStructuredOutput): RunExportSection {
+function buildImagePromptsSection(
+  output: FormattedStructuredOutput,
+): RunExportSection | null {
+  if (!output.imagePrompts.length) {
+    return null;
+  }
+
   return {
     key: "imagePrompts",
-    title: "Image prompts",
+    title: sectionLabels.imagePrompts,
     kind: "items",
     items: output.imagePrompts.map((prompt, index) => ({
       title: `${index + 1}. ${prompt.assetType}`,
@@ -157,31 +291,88 @@ function renderSectionMarkdown(section: RunExportSection) {
   ]);
 }
 
-function buildCopySections(sections: RunExportSection[]) {
-  return sections.reduce<Record<ResultsSectionKey, ResultsSectionCopy>>((accumulator, section) => {
-    accumulator[section.key] = {
-      key: section.key,
-      label: section.title,
-      copyText: `${section.title}\n\n${renderSectionPlainText(section)}`,
-    };
+function buildCopySections(output: FormattedStructuredOutput) {
+  return {
+    overview: createCopySection("overview", buildOverviewSection(output)),
+    calendar: createCopySection("calendar", buildCalendarSection(output)),
+    captions: createCopySection("captions", buildCaptionsSection(output)),
+    hashtags: createCopySection("hashtags", buildHashtagsSection(output)),
+    imagePrompts: createCopySection(
+      "imagePrompts",
+      buildImagePromptsSection(output),
+    ),
+  };
+}
 
-    return accumulator;
-  }, {} as Record<ResultsSectionKey, ResultsSectionCopy>);
+export function isRunExportContentError(
+  error: unknown,
+): error is RunExportContentError {
+  return error instanceof RunExportContentError;
+}
+
+export function getRunExportContentErrorMessage(
+  error: RunExportContentError,
+  target: "results" | "export" | "delivery",
+) {
+  if (error.code === "EMPTY_OUTPUT") {
+    switch (target) {
+      case "results":
+        return "This run does not have any saved content available to show yet.";
+      case "delivery":
+        return "This run does not have any saved content to deliver yet.";
+      default:
+        return "This run does not have any saved content to export yet.";
+    }
+  }
+
+  switch (target) {
+    case "results":
+      return "This saved run result couldn't be displayed reliably. Regenerate the run or contact support.";
+    case "delivery":
+      return "This saved run result couldn't be prepared for Google Docs delivery. Regenerate the run or contact support.";
+    default:
+      return "This saved run result couldn't be prepared for export. Regenerate the run or contact support.";
+  }
+}
+
+export function normalizeStructuredOutputRecord(
+  output: StoredOutputRecord | unknown,
+): StructuredOutputNormalizationResult {
+  const source = isPlainObject(output) ? output : {};
+  const campaignSummary = normalizeStringField(source.campaignSummary);
+  const calendarEntries = normalizeArrayField(
+    source.calendarEntries,
+    exportCalendarEntrySchema,
+  );
+  const captions = normalizeArrayField(source.captions, exportCaptionSchema);
+  const hashtags = normalizeArrayField(source.hashtags, exportHashtagSetSchema);
+  const imagePrompts = normalizeArrayField(
+    source.imagePrompts,
+    exportImagePromptSchema,
+  );
+
+  return {
+    formattedOutput: {
+      campaignSummary: campaignSummary.value,
+      calendarEntries: calendarEntries.value,
+      captions: captions.value,
+      hashtags: hashtags.value,
+      imagePrompts: imagePrompts.value,
+    },
+    hadInvalidData:
+      !isPlainObject(output) ||
+      campaignSummary.hadInvalidData ||
+      calendarEntries.hadInvalidData ||
+      captions.hadInvalidData ||
+      hashtags.hadInvalidData ||
+      imagePrompts.hadInvalidData,
+  };
 }
 
 export function parseStructuredOutputRecord(
-  output: Pick<
-    StructuredOutput,
-    "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
-  >,
+  output: StoredOutputRecord,
 ): FormattedStructuredOutput {
-  return storedStructuredOutputSchema.parse({
-    campaignSummary: output.campaignSummary,
-    calendarEntries: output.calendarEntries,
-    captions: output.captions,
-    hashtags: output.hashtags,
-    imagePrompts: output.imagePrompts,
-  });
+  return normalizeStructuredOutputRecord(output).formattedOutput;
 }
 
 export function buildRunExportContent(input: {
@@ -189,30 +380,45 @@ export function buildRunExportContent(input: {
   createdAt: Date;
   model: string;
   workspaceName?: string;
-  output: Pick<
-    StructuredOutput,
-    "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
-  >;
+  output: StoredOutputRecord;
 }): RunExportContent {
-  const formattedOutput = parseStructuredOutputRecord(input.output);
+  const normalization = normalizeStructuredOutputRecord(input.output);
+  const formattedOutput = normalization.formattedOutput;
   const title = `${input.businessName} content plan`;
   const generatedLabel = `Generated ${formatShortDate(input.createdAt)} with ${input.model}`;
-  const workspaceLabel = input.workspaceName ? `Workspace: ${input.workspaceName}` : undefined;
+  const workspaceLabel = input.workspaceName
+    ? `Workspace: ${input.workspaceName}`
+    : undefined;
   const sections: RunExportSection[] = [
     buildOverviewSection(formattedOutput),
     buildCalendarSection(formattedOutput),
     buildCaptionsSection(formattedOutput),
     buildHashtagsSection(formattedOutput),
     buildImagePromptsSection(formattedOutput),
-  ];
-  const copySections = buildCopySections(sections);
+  ].filter((section): section is RunExportSection => section !== null);
+
+  if (!sections.length) {
+    throw new RunExportContentError(
+      normalization.hadInvalidData ? "MALFORMED_OUTPUT" : "EMPTY_OUTPUT",
+      normalization.hadInvalidData
+        ? "Saved run output is malformed."
+        : "Saved run output is empty.",
+    );
+  }
+
+  const copySections = buildCopySections(formattedOutput);
 
   const plainText = [
     title,
     ...(workspaceLabel ? [workspaceLabel] : []),
     generatedLabel,
     "",
-    ...sections.flatMap((section) => [section.title, "", renderSectionPlainText(section), ""]),
+    ...sections.flatMap((section) => [
+      section.title,
+      "",
+      renderSectionPlainText(section),
+      "",
+    ]),
   ]
     .join("\n")
     .trim();
@@ -223,7 +429,11 @@ export function buildRunExportContent(input: {
     ...(workspaceLabel ? [workspaceLabel, ""] : []),
     generatedLabel,
     "",
-    ...sections.flatMap((section) => [`## ${section.title}`, "", ...renderSectionMarkdown(section)]),
+    ...sections.flatMap((section) => [
+      `## ${section.title}`,
+      "",
+      ...renderSectionMarkdown(section),
+    ]),
   ]
     .join("\n")
     .trim();

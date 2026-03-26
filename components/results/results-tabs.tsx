@@ -28,8 +28,19 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-lg font-medium text-[var(--ink)]">{title}</p>
-      <CopyTextButton label={`Copied ${title.toLowerCase()}.`} text={copyText} />
+      <CopyTextButton
+        label={`Copied ${title.toLowerCase()}.`}
+        text={copyText}
+      />
     </div>
+  );
+}
+
+function SectionEmptyState({ label }: { label: string }) {
+  return (
+    <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
+      No saved {label.toLowerCase()} is available in this run yet.
+    </p>
   );
 }
 
@@ -92,33 +103,48 @@ export function ResultsTabs({
               copyText={copySections.overview.copyText}
               title="Campaign summary"
             />
-            <div className="mt-4">
-              <SectionRefinementPanel
-                currentContent={output.campaignSummary}
-                renderProposalPreview={(proposal) => (
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
-                    {proposal}
-                  </p>
-                )}
-                runId={runId}
-                sectionKey="campaignSummary"
-                workspaceId={workspaceId}
-              />
-            </div>
-            <p className="mt-4 whitespace-pre-wrap text-base leading-8 text-[var(--ink)]">
-              {output.campaignSummary}
-            </p>
+            {output.campaignSummary.trim() ? (
+              <>
+                <div className="mt-4">
+                  <SectionRefinementPanel
+                    currentContent={output.campaignSummary}
+                    renderProposalPreview={(proposal) => (
+                      <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                        {proposal}
+                      </p>
+                    )}
+                    runId={runId}
+                    sectionKey="campaignSummary"
+                    workspaceId={workspaceId}
+                  />
+                </div>
+                <p className="mt-4 whitespace-pre-wrap text-base leading-8 text-[var(--ink)]">
+                  {output.campaignSummary}
+                </p>
+              </>
+            ) : (
+              <SectionEmptyState label="campaign summary" />
+            )}
           </div>
         ) : null}
 
         {active === "calendar" ? (
           <div className="space-y-4">
             <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-6">
-              <SectionHeader copyText={copySections.calendar.copyText} title="Calendar" />
+              <SectionHeader
+                copyText={copySections.calendar.copyText}
+                title="Calendar"
+              />
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
-                {output.calendarEntries.length} planned entries across the saved run.
+                {output.calendarEntries.length} planned entries across the saved
+                run.
               </p>
             </div>
+            {!output.calendarEntries.length ? (
+              <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-[var(--panel-strong)] p-5">
+                <SectionEmptyState label="calendar entries" />
+              </div>
+            ) : null}
             {output.calendarEntries.map((entry, index) => (
               <article
                 className="rounded-[1.75rem] border border-[var(--line)] bg-white/80 p-5"
@@ -126,9 +152,13 @@ export function ResultsTabs({
               >
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="font-medium text-[var(--ink)]">{entry.day}</p>
-                  <span className="text-sm text-[var(--ink-soft)]">{entry.platform}</span>
+                  <span className="text-sm text-[var(--ink-soft)]">
+                    {entry.platform}
+                  </span>
                 </div>
-                <p className="mt-3 text-sm leading-7 text-[var(--ink)]">{entry.angle}</p>
+                <p className="mt-3 text-sm leading-7 text-[var(--ink)]">
+                  {entry.angle}
+                </p>
                 <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                   CTA · {entry.callToAction}
                 </p>
@@ -140,36 +170,45 @@ export function ResultsTabs({
         {active === "captions" ? (
           <div className="space-y-4">
             <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-6">
-              <SectionHeader copyText={copySections.captions.copyText} title="Captions" />
+              <SectionHeader
+                copyText={copySections.captions.copyText}
+                title="Captions"
+              />
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
                 Sample caption copy for reuse, editing, or export.
               </p>
-              <div className="mt-4">
-                <SectionRefinementPanel
-                  currentContent={output.captions}
-                  renderProposalPreview={(proposal) => (
-                    <div className="space-y-3">
-                      {proposal.map((caption, index) => (
-                        <article
-                          className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
-                          key={`${caption.headline}-${index}`}
-                        >
-                          <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-                            {caption.platform}
-                          </p>
-                          <p className="mt-2 font-medium text-[var(--ink)]">{caption.headline}</p>
-                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink-soft)]">
-                            {caption.body}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                  runId={runId}
-                  sectionKey="captions"
-                  workspaceId={workspaceId}
-                />
-              </div>
+              {output.captions.length ? (
+                <div className="mt-4">
+                  <SectionRefinementPanel
+                    currentContent={output.captions}
+                    renderProposalPreview={(proposal) => (
+                      <div className="space-y-3">
+                        {proposal.map((caption, index) => (
+                          <article
+                            className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
+                            key={`${caption.headline}-${index}`}
+                          >
+                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+                              {caption.platform}
+                            </p>
+                            <p className="mt-2 font-medium text-[var(--ink)]">
+                              {caption.headline}
+                            </p>
+                            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink-soft)]">
+                              {caption.body}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                    runId={runId}
+                    sectionKey="captions"
+                    workspaceId={workspaceId}
+                  />
+                </div>
+              ) : (
+                <SectionEmptyState label="captions" />
+              )}
             </div>
             {output.captions.map((caption, index) => (
               <article
@@ -179,7 +218,9 @@ export function ResultsTabs({
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
                   {caption.platform}
                 </p>
-                <p className="mt-2 font-medium text-[var(--ink)]">{caption.headline}</p>
+                <p className="mt-2 font-medium text-[var(--ink)]">
+                  {caption.headline}
+                </p>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink-soft)]">
                   {caption.body}
                 </p>
@@ -191,33 +232,42 @@ export function ResultsTabs({
         {active === "hashtags" ? (
           <div className="space-y-4">
             <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-6">
-              <SectionHeader copyText={copySections.hashtags.copyText} title="Hashtags" />
+              <SectionHeader
+                copyText={copySections.hashtags.copyText}
+                title="Hashtags"
+              />
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
                 Platform-specific hashtag groupings from the saved run.
               </p>
-              <div className="mt-4">
-                <SectionRefinementPanel
-                  currentContent={output.hashtags}
-                  renderProposalPreview={(proposal) => (
-                    <div className="space-y-3">
-                      {proposal.map((item) => (
-                        <article
-                          className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
-                          key={item.platform}
-                        >
-                          <p className="font-medium text-[var(--ink)]">{item.platform}</p>
-                          <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-                            {item.tags.join(" ")}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                  runId={runId}
-                  sectionKey="hashtags"
-                  workspaceId={workspaceId}
-                />
-              </div>
+              {output.hashtags.length ? (
+                <div className="mt-4">
+                  <SectionRefinementPanel
+                    currentContent={output.hashtags}
+                    renderProposalPreview={(proposal) => (
+                      <div className="space-y-3">
+                        {proposal.map((item) => (
+                          <article
+                            className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
+                            key={item.platform}
+                          >
+                            <p className="font-medium text-[var(--ink)]">
+                              {item.platform}
+                            </p>
+                            <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
+                              {item.tags.join(" ")}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                    runId={runId}
+                    sectionKey="hashtags"
+                    workspaceId={workspaceId}
+                  />
+                </div>
+              ) : (
+                <SectionEmptyState label="hashtags" />
+              )}
             </div>
             {output.hashtags.map((item) => (
               <article
@@ -243,31 +293,35 @@ export function ResultsTabs({
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
                 Prompt-ready visual directions paired to the current run.
               </p>
-              <div className="mt-4">
-                <SectionRefinementPanel
-                  currentContent={output.imagePrompts}
-                  renderProposalPreview={(proposal) => (
-                    <div className="space-y-3">
-                      {proposal.map((item, index) => (
-                        <article
-                          className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
-                          key={`${item.assetType}-${index}`}
-                        >
-                          <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
-                            {item.assetType}
-                          </p>
-                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
-                            {item.prompt}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                  runId={runId}
-                  sectionKey="imagePrompts"
-                  workspaceId={workspaceId}
-                />
-              </div>
+              {output.imagePrompts.length ? (
+                <div className="mt-4">
+                  <SectionRefinementPanel
+                    currentContent={output.imagePrompts}
+                    renderProposalPreview={(proposal) => (
+                      <div className="space-y-3">
+                        {proposal.map((item, index) => (
+                          <article
+                            className="rounded-[1.25rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4"
+                            key={`${item.assetType}-${index}`}
+                          >
+                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+                              {item.assetType}
+                            </p>
+                            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                              {item.prompt}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                    runId={runId}
+                    sectionKey="imagePrompts"
+                    workspaceId={workspaceId}
+                  />
+                </div>
+              ) : (
+                <SectionEmptyState label="image prompts" />
+              )}
             </div>
             {output.imagePrompts.map((item, index) => (
               <article

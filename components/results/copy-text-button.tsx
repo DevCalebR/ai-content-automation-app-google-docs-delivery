@@ -8,11 +8,15 @@ import { Button } from "@/components/ui/button";
 export function CopyTextButton({
   text,
   label,
+  buttonLabel = "Copy",
+  pendingButtonLabel = "Copied",
   variant = "secondary",
   size = "sm",
 }: {
   text: string;
   label: string;
+  buttonLabel?: string;
+  pendingButtonLabel?: string;
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "default" | "sm" | "lg";
 }) {
@@ -36,8 +40,12 @@ export function CopyTextButton({
       type="button"
       variant={variant}
     >
-      {pending ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-      {pending ? "Copied" : "Copy"}
+      {pending ? (
+        <Check className="mr-2 h-4 w-4" />
+      ) : (
+        <Copy className="mr-2 h-4 w-4" />
+      )}
+      {pending ? pendingButtonLabel : buttonLabel}
     </Button>
   );
 }

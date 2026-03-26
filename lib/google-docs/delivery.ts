@@ -11,9 +11,14 @@ export async function deliverStructuredOutputToGoogleDocs(input: {
   businessName: string;
   createdAt: Date;
   model: string;
+  workspaceName?: string;
   output: Pick<
     StructuredOutput,
-    "campaignSummary" | "calendarEntries" | "captions" | "hashtags" | "imagePrompts"
+    | "campaignSummary"
+    | "calendarEntries"
+    | "captions"
+    | "hashtags"
+    | "imagePrompts"
   >;
   connectionMetadata: GoogleDocsConnectionMetadata;
   clients?: GoogleDocsApiClients;
@@ -22,6 +27,7 @@ export async function deliverStructuredOutputToGoogleDocs(input: {
     businessName: input.businessName,
     createdAt: input.createdAt,
     model: input.model,
+    workspaceName: input.workspaceName,
     output: input.output,
   });
 
