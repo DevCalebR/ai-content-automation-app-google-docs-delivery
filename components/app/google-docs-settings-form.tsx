@@ -2,10 +2,16 @@
 
 import { useActionState } from "react";
 import { saveGoogleDocsConnectionAction } from "@/app/(app)/app/actions";
-import { FormStateMessage } from "@/components/ui/form-state";
+import {
+  FieldErrorMessage,
+  FormStateMessage,
+} from "@/components/ui/form-state";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { GoogleDocsAuthMode } from "@/lib/validations/google-docs";
+
+const invalidFieldClassName =
+  "border-[var(--danger)] focus:border-[var(--danger)]";
 
 export function GoogleDocsSettingsForm({
   workspaceId,
@@ -30,6 +36,7 @@ export function GoogleDocsSettingsForm({
       folderId: initialFolderId ?? "",
       titlePrefix: initialTitlePrefix ?? "",
     },
+    fieldErrors: {},
   });
   const usingUserOAuth = authMode === "USER_OAUTH";
   const isDisabled = !modeReady || (usingUserOAuth && !oauthConnected);
@@ -42,16 +49,27 @@ export function GoogleDocsSettingsForm({
   const submitLabel = usingUserOAuth
     ? "Save My Drive delivery settings"
     : "Save service account delivery settings";
+  const formKey = `${authMode}-${state.values.folderId}-${state.values.titlePrefix}-${state.status}`;
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} className="space-y-5" key={formKey}>
       <input name="workspaceId" type="hidden" value={workspaceId} />
       <input name="authMode" type="hidden" value={authMode} />
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[var(--ink-soft)]" htmlFor="folderId">
+        <label
+          className="text-sm font-medium text-[var(--ink-soft)]"
+          htmlFor="folderId"
+        >
           {fieldLabel}
         </label>
         <Input
+          aria-describedby={
+            state.fieldErrors?.folderId ? "folderId-error" : undefined
+          }
+          aria-invalid={Boolean(state.fieldErrors?.folderId)}
+          className={
+            state.fieldErrors?.folderId ? invalidFieldClassName : undefined
+          }
           defaultValue={state.values.folderId}
           disabled={isDisabled}
           id="folderId"
@@ -59,21 +77,41 @@ export function GoogleDocsSettingsForm({
           placeholder="1AbCdEfGhIjKlMnOpQrStUvWxYz"
           required
         />
+        <p className="text-xs leading-6 text-[var(--ink-soft)]">{helperText}</p>
         <p className="text-xs leading-6 text-[var(--ink-soft)]">
-          {helperText}
+          Paste only the folder ID, which is the part after `/folders/` in the
+          Google Drive URL.
         </p>
+        <FieldErrorMessage
+          id="folderId-error"
+          message={state.fieldErrors?.folderId}
+        />
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[var(--ink-soft)]" htmlFor="titlePrefix">
+        <label
+          className="text-sm font-medium text-[var(--ink-soft)]"
+          htmlFor="titlePrefix"
+        >
           Document title prefix
         </label>
         <Input
+          aria-describedby={
+            state.fieldErrors?.titlePrefix ? "titlePrefix-error" : undefined
+          }
+          aria-invalid={Boolean(state.fieldErrors?.titlePrefix)}
+          className={
+            state.fieldErrors?.titlePrefix ? invalidFieldClassName : undefined
+          }
           defaultValue={state.values.titlePrefix}
           disabled={isDisabled}
           id="titlePrefix"
           name="titlePrefix"
           placeholder="North Star Media"
+        />
+        <FieldErrorMessage
+          id="titlePrefix-error"
+          message={state.fieldErrors?.titlePrefix}
         />
       </div>
 
@@ -85,12 +123,16 @@ export function GoogleDocsSettingsForm({
         </p>
       ) : usingUserOAuth && !oauthConnected ? (
         <p className="text-sm text-[var(--ink-soft)]">
-          Connect a Google account for this workspace before saving a My Drive delivery folder.
+          Connect a Google account for this workspace first, then save the My
+          Drive folder that should receive delivered documents.
         </p>
       ) : null}
 
       <FormStateMessage state={state} />
-      <SubmitButton disabled={isDisabled} pendingLabel="Saving delivery settings...">
+      <SubmitButton
+        disabled={isDisabled}
+        pendingLabel="Saving delivery settings..."
+      >
         {submitLabel}
       </SubmitButton>
     </form>

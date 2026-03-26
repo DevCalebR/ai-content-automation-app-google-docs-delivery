@@ -8,7 +8,10 @@ import { RunResultsToolbar } from "@/components/results/run-results-toolbar";
 import { requireSession } from "@/lib/auth/session";
 import { getRunForWorkspace } from "@/lib/data/runs";
 import { db } from "@/lib/db";
-import { hasGoogleDocsServiceAccountConfig } from "@/lib/google-docs/client";
+import {
+  hasGoogleDocsOAuthConfig,
+  hasGoogleDocsServiceAccountConfig,
+} from "@/lib/google-docs/client";
 import { getGoogleDocsConnectionMetadata } from "@/lib/google-docs/connection";
 import {
   buildRunExportContent,
@@ -49,6 +52,12 @@ export default async function ResultsPage({ params }: PageProps) {
   });
   const googleDocsMetadata =
     getGoogleDocsConnectionMetadata(googleDocsConnection);
+  const googleDocsServerReady =
+    googleDocsMetadata?.authMode === "USER_OAUTH"
+      ? hasGoogleDocsOAuthConfig()
+      : googleDocsMetadata?.authMode === "SERVICE_ACCOUNT"
+        ? hasGoogleDocsServiceAccountConfig()
+        : hasGoogleDocsOAuthConfig() || hasGoogleDocsServiceAccountConfig();
   const googleDocsDelivery = run.deliveries.find(
     (delivery) => delivery.provider === "GOOGLE_DOCS",
   );
@@ -89,7 +98,9 @@ export default async function ResultsPage({ params }: PageProps) {
             <p className="mt-3 text-base leading-8 text-[var(--ink-soft)]">
               Generated {formatShortDate(run.createdAt)} with {run.model}.
               Review the campaign summary, calendar, captions, hashtags, and
-              image prompts for this run in one place.
+              image prompts for this run in one place, then copy it, download
+              DOCX or PDF, deliver it to Google Docs, or refine individual
+              sections below.
             </p>
           </div>
           <Badge>{run.status}</Badge>
@@ -124,7 +135,7 @@ export default async function ResultsPage({ params }: PageProps) {
             copyAllText={exportContent!.plainText}
             docxDownloadUrl={`${downloadBasePath}?format=docx`}
             googleDocsConnected={Boolean(googleDocsMetadata)}
-            googleDocsServerReady={hasGoogleDocsServiceAccountConfig()}
+            googleDocsServerReady={googleDocsServerReady}
             isOwner={authorization.isOwner}
             latestDelivery={googleDocsDelivery}
             markdownDownloadUrl={`${downloadBasePath}?format=markdown`}

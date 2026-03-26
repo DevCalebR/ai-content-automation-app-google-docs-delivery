@@ -1,4 +1,5 @@
 import type { ActionState } from "@/components/ui/form-state";
+import type { GoogleDocsSettingsFieldErrors } from "@/lib/validations/google-docs";
 
 type GoogleDocsSettingsValues = {
   folderId: string;
@@ -7,6 +8,7 @@ type GoogleDocsSettingsValues = {
 
 export type GoogleDocsSettingsState = ActionState & {
   values: GoogleDocsSettingsValues;
+  fieldErrors?: GoogleDocsSettingsFieldErrors;
 };
 
 export type GoogleDocsDeliveryState = ActionState & {
@@ -19,6 +21,7 @@ export const initialGoogleDocsSettingsState: GoogleDocsSettingsState = {
     folderId: "",
     titlePrefix: "",
   },
+  fieldErrors: {},
 };
 
 export const initialGoogleDocsDeliveryState: GoogleDocsDeliveryState = {

@@ -34,8 +34,9 @@ export default async function HistoryPage({ params }: PageProps) {
           Every generation attempt stays attached to {workspace.name}.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Use history to revisit results, validate persistence, and confirm which brief and
-          preset produced each structured output.
+          Use history to revisit results, confirm which brief and preset
+          produced each structured output, and reopen completed runs for exports
+          or delivery.
         </p>
       </Panel>
       <Panel className="p-7">
@@ -53,23 +54,32 @@ export default async function HistoryPage({ params }: PageProps) {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <p className="font-medium text-[var(--ink)]">{run.brief.businessName}</p>
+                      <p className="font-medium text-[var(--ink)]">
+                        {run.brief.businessName}
+                      </p>
                       <p className="mt-1 text-sm text-[var(--ink-soft)]">
                         {run.preset?.name ?? "Brief preset"} · {run.model}
                       </p>
                       <p className="mt-3 text-sm text-[var(--ink-soft)]">
                         Created {formatShortDate(run.createdAt)}
-                        {run.completedAt ? ` · Completed ${formatShortDate(run.completedAt)}` : ""}
+                        {run.completedAt
+                          ? ` · Completed ${formatShortDate(run.completedAt)}`
+                          : ""}
                       </p>
                       <p className="mt-2 text-sm text-[var(--ink-soft)]">
                         {runsByBrief[run.briefId]} run
-                        {runsByBrief[run.briefId] === 1 ? "" : "s"} from this brief.
+                        {runsByBrief[run.briefId] === 1 ? "" : "s"} from this
+                        brief.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge>{run.status}</Badge>
-                      {run.structuredOutput ? <Badge>EXPORT_READY</Badge> : null}
-                      {googleDocsDelivery ? <Badge>{googleDocsDelivery.status}</Badge> : null}
+                      {run.structuredOutput ? (
+                        <Badge>EXPORT_READY</Badge>
+                      ) : null}
+                      {googleDocsDelivery ? (
+                        <Badge>{googleDocsDelivery.status}</Badge>
+                      ) : null}
                     </div>
                   </div>
                   {run.structuredOutput?.campaignSummary ? (
@@ -78,11 +88,19 @@ export default async function HistoryPage({ params }: PageProps) {
                     </p>
                   ) : null}
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <Link href={`/app/workspaces/${workspace.id}/results/${run.id}`}>
-                      <span className="text-sm font-medium text-[var(--ink)]">Open results</span>
+                    <Link
+                      href={`/app/workspaces/${workspace.id}/results/${run.id}`}
+                    >
+                      <span className="text-sm font-medium text-[var(--ink)]">
+                        Open results
+                      </span>
                     </Link>
-                    <Link href={`/app/workspaces/${workspace.id}/generate?briefId=${run.briefId}`}>
-                      <span className="text-sm font-medium text-[var(--ink)]">Generate again</span>
+                    <Link
+                      href={`/app/workspaces/${workspace.id}/generate?briefId=${run.briefId}`}
+                    >
+                      <span className="text-sm font-medium text-[var(--ink)]">
+                        Generate again
+                      </span>
                     </Link>
                     {googleDocsDelivery?.externalUrl ? (
                       <a
@@ -100,7 +118,24 @@ export default async function HistoryPage({ params }: PageProps) {
             })
           ) : (
             <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
-              No runs have been recorded for this workspace yet.
+              <p>No runs have been recorded for this workspace yet.</p>
+              <p className="mt-3">
+                Generate the first plan for this workspace, then return here any
+                time you need to reopen results, compare runs, or deliver a
+                saved document.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link href={`/app/workspaces/${workspace.id}/generate`}>
+                  <span className="font-medium text-[var(--ink)]">
+                    Generate first plan
+                  </span>
+                </Link>
+                <Link href={`/app/workspaces/${workspace.id}`}>
+                  <span className="font-medium text-[var(--ink)]">
+                    Back to workspace
+                  </span>
+                </Link>
+              </div>
             </div>
           )}
         </div>

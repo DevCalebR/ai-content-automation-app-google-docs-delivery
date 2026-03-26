@@ -32,32 +32,44 @@ export default async function DashboardPage() {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <Panel className="p-7">
           <p className="section-heading">Dashboard</p>
-        <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
-          Manage briefs, launch runs, and review saved content structure.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Keep each workspace organized with reusable presets, structured briefs, saved
-          runs, and a consistent OpenAI-powered generation workflow.
-        </p>
+          <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
+            Manage briefs, launch runs, and deliver finished content plans.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
+            Keep each workspace organized with reusable presets, structured
+            briefs, saved runs, and a consistent generation workflow that ends
+            in exports or Google Docs delivery.
+          </p>
         </Panel>
         <Panel className="p-7">
           <p className="section-heading">At a glance</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
-              <p className="text-3xl font-medium text-[var(--ink)]">{workspaces.length}</p>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]">Active workspaces</p>
+              <p className="text-3xl font-medium text-[var(--ink)]">
+                {workspaces.length}
+              </p>
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                Active workspaces
+              </p>
             </div>
             <div>
               <p className="text-3xl font-medium text-[var(--ink)]">
                 {workspaces.reduce((sum, item) => sum + item._count.briefs, 0)}
               </p>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]">Saved briefs</p>
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                Saved briefs
+              </p>
             </div>
             <div>
               <p className="text-3xl font-medium text-[var(--ink)]">
-                {workspaces.reduce((sum, item) => sum + item._count.generationRuns, 0)}
+                {workspaces.reduce(
+                  (sum, item) => sum + item._count.generationRuns,
+                  0,
+                )}
               </p>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]">Generation runs</p>
+              <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                Generation runs
+              </p>
             </div>
           </div>
         </Panel>
@@ -69,10 +81,14 @@ export default async function DashboardPage() {
             <div>
               <p className="section-heading">Workspaces</p>
               <p className="mt-2 text-sm text-[var(--ink-soft)]">
-                Open a workspace to edit briefs, generate content, or review settings.
+                Open a workspace to edit briefs, generate content, or review
+                settings.
               </p>
             </div>
-            <Link className="text-sm font-medium text-[var(--ink)]" href="/app/onboarding">
+            <Link
+              className="text-sm font-medium text-[var(--ink)]"
+              href="/app/onboarding"
+            >
               Create another
             </Link>
           </div>
@@ -85,13 +101,16 @@ export default async function DashboardPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-lg font-medium text-[var(--ink)]">{workspace.name}</p>
+                    <p className="text-lg font-medium text-[var(--ink)]">
+                      {workspace.name}
+                    </p>
                     <p className="mt-2 text-sm text-[var(--ink-soft)]">
                       {workspace.description || "No description added yet."}
                     </p>
                   </div>
                   <Badge>
-                    {workspace._count.briefs} briefs · {workspace._count.generationRuns} runs
+                    {workspace._count.briefs} briefs ·{" "}
+                    {workspace._count.generationRuns} runs
                   </Badge>
                 </div>
               </Link>
@@ -111,8 +130,12 @@ export default async function DashboardPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-[var(--ink)]">{run.brief.businessName}</p>
-                      <p className="mt-1 text-sm text-[var(--ink-soft)]">{run.workspace.name}</p>
+                      <p className="font-medium text-[var(--ink)]">
+                        {run.brief.businessName}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--ink-soft)]">
+                        {run.workspace.name}
+                      </p>
                     </div>
                     <Badge>{run.status}</Badge>
                   </div>
@@ -123,8 +146,18 @@ export default async function DashboardPage() {
               ))
             ) : (
               <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
-                No runs yet. Save a structured brief, then open a workspace generate page to
-                create your first plan.
+                <p>
+                  No runs yet. Start inside a workspace by saving a brief, then
+                  generate the first plan.
+                </p>
+                <div className="mt-4">
+                  <Link
+                    className="font-medium text-[var(--ink)]"
+                    href={`/app/workspaces/${workspaces[0]?.id}`}
+                  >
+                    Open the first workspace
+                  </Link>
+                </div>
               </div>
             )}
           </div>

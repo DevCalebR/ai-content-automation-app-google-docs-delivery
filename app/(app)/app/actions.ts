@@ -6,7 +6,13 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { logAuditEvent, logError } from "@/lib/logger";
-import { workspaceSchema } from "@/lib/validations/workspace";
+import {
+  buildWorkspaceFormValues,
+  createInitialWorkspaceState,
+  getWorkspaceFieldErrors,
+  workspaceSchema,
+  type WorkspaceFormState,
+} from "@/lib/validations/workspace";
 import {
   briefFormSchema,
   buildBriefFormValues,
@@ -47,6 +53,7 @@ import {
 import {
   googleDocsConnectionFormSchema,
   googleDocsDeliveryRequestSchema,
+  getGoogleDocsSettingsFieldErrors,
   type GoogleDocsAuthMode,
 } from "@/lib/validations/google-docs";
 import {
@@ -55,25 +62,31 @@ import {
   getWorkspaceAuthorizationForUser,
 } from "@/lib/workspaces/service";
 
-const idleState: ActionState = {
-  status: "idle",
-};
-
 export async function createWorkspaceAction(
-  prevState: ActionState = idleState,
+  prevState: WorkspaceFormState = createInitialWorkspaceState(
+    buildWorkspaceFormValues({ workspaceId: "", name: "", description: "" }),
+  ),
   formData: FormData,
-): Promise<ActionState> {
-  void prevState;
+): Promise<WorkspaceFormState> {
   const session = await requireSession();
-  const parsed = workspaceSchema.safeParse({
+  const submissionId = prevState.submissionId + 1;
+  const submittedValues = buildWorkspaceFormValues({
+    workspaceId: "",
     name: formData.get("name"),
     description: formData.get("description"),
+  });
+  const parsed = workspaceSchema.safeParse({
+    name: submittedValues.name,
+    description: submittedValues.description,
   });
 
   if (!parsed.success) {
     return {
       status: "error",
-      message: parsed.error.issues[0]?.message ?? "Enter a workspace name.",
+      message: "Please correct the highlighted fields.",
+      values: submittedValues,
+      fieldErrors: getWorkspaceFieldErrors(parsed.error),
+      submissionId,
     };
   }
 
@@ -553,23 +566,32 @@ export async function acceptRunSectionRefinementAction(
 }
 
 export async function updateWorkspaceSettingsAction(
-  prevState: ActionState = idleState,
+  prevState: WorkspaceFormState = createInitialWorkspaceState(
+    buildWorkspaceFormValues({ workspaceId: "", name: "", description: "" }),
+  ),
   formData: FormData,
-): Promise<ActionState> {
-  void prevState;
+): Promise<WorkspaceFormState> {
   const session = await requireSession();
-  const workspaceId = String(formData.get("workspaceId") ?? "");
-
-  const parsed = workspaceSchema.safeParse({
+  const submissionId = prevState.submissionId + 1;
+  const submittedValues = buildWorkspaceFormValues({
+    workspaceId: formData.get("workspaceId"),
     name: formData.get("name"),
     description: formData.get("description"),
+  });
+  const workspaceId = submittedValues.workspaceId;
+
+  const parsed = workspaceSchema.safeParse({
+    name: submittedValues.name,
+    description: submittedValues.description,
   });
 
   if (!parsed.success) {
     return {
       status: "error",
-      message:
-        parsed.error.issues[0]?.message ?? "Enter valid workspace details.",
+      message: "Please correct the highlighted fields.",
+      values: submittedValues,
+      fieldErrors: getWorkspaceFieldErrors(parsed.error),
+      submissionId,
     };
   }
 
@@ -582,6 +604,9 @@ export async function updateWorkspaceSettingsAction(
     return {
       status: "error",
       message: "Only workspace owners can update settings.",
+      values: submittedValues,
+      fieldErrors: {},
+      submissionId,
     };
   }
 
@@ -599,6 +624,13 @@ export async function updateWorkspaceSettingsAction(
   return {
     status: "success",
     message: "Workspace settings updated.",
+    values: buildWorkspaceFormValues({
+      workspaceId: authorization.workspace.id,
+      name: parsed.data.name,
+      description: parsed.data.description,
+    }),
+    fieldErrors: {},
+    submissionId,
   };
 }
 
@@ -625,13 +657,12 @@ export async function saveGoogleDocsConnectionAction(
   if (!parsed.success) {
     return {
       status: "error",
-      message:
-        parsed.error.issues[0]?.message ??
-        "Enter a valid Google Drive folder ID.",
+      message: "Please correct the highlighted fields.",
       values: {
         folderId: submittedValues.folderId,
         titlePrefix: submittedValues.titlePrefix,
       },
+      fieldErrors: getGoogleDocsSettingsFieldErrors(parsed.error),
     };
   }
 
@@ -649,6 +680,7 @@ export async function saveGoogleDocsConnectionAction(
         folderId: submittedValues.folderId,
         titlePrefix: submittedValues.titlePrefix,
       },
+      fieldErrors: {},
     };
   }
 
@@ -681,6 +713,7 @@ export async function saveGoogleDocsConnectionAction(
           folderId: submittedValues.folderId,
           titlePrefix: submittedValues.titlePrefix,
         },
+        fieldErrors: {},
       };
     }
 
@@ -693,6 +726,7 @@ export async function saveGoogleDocsConnectionAction(
           folderId: submittedValues.folderId,
           titlePrefix: submittedValues.titlePrefix,
         },
+        fieldErrors: {},
       };
     }
   } else if (!hasGoogleDocsServiceAccountConfig()) {
@@ -704,6 +738,7 @@ export async function saveGoogleDocsConnectionAction(
         folderId: submittedValues.folderId,
         titlePrefix: submittedValues.titlePrefix,
       },
+      fieldErrors: {},
     };
   }
 
@@ -786,6 +821,7 @@ export async function saveGoogleDocsConnectionAction(
         folderId: folder.folderId,
         titlePrefix: parsed.data.titlePrefix?.trim() || "",
       },
+      fieldErrors: {},
     };
   } catch (error) {
     logError(error, "google-docs.connection");
@@ -835,6 +871,7 @@ export async function saveGoogleDocsConnectionAction(
         folderId: submittedValues.folderId,
         titlePrefix: submittedValues.titlePrefix,
       },
+      fieldErrors: {},
     };
   }
 }

@@ -12,7 +12,10 @@ type PageProps = {
   searchParams: Promise<{ briefId?: string; error?: string }>;
 };
 
-export default async function GeneratePage({ params, searchParams }: PageProps) {
+export default async function GeneratePage({
+  params,
+  searchParams,
+}: PageProps) {
   const session = await requireSession();
   const { workspaceId } = await params;
   const { briefId, error } = await searchParams;
@@ -35,22 +38,23 @@ export default async function GeneratePage({ params, searchParams }: PageProps) 
           Launch a structured content plan from a saved brief.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Run a server-side OpenAI workflow that turns a saved brief into a structured
-          content plan you can review, refine, and reuse.
+          Run a server-side OpenAI workflow that turns a saved brief into a
+          structured content plan you can review, refine, export, and deliver.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5">
             <p className="font-medium text-[var(--ink)]">Stored result shape</p>
             <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-              Campaign summary, calendar entries, sample captions, hashtag sets, and image
-              prompts are normalized into a structured output record.
+              Campaign summary, calendar entries, sample captions, hashtag sets,
+              and image prompts are normalized into a structured output record.
             </p>
           </div>
           <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5">
-            <p className="font-medium text-[var(--ink)]">Reusable delivery format</p>
+            <p className="font-medium text-[var(--ink)]">What happens next</p>
             <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-              Every run is saved in a consistent structure so your team can revisit the
-              output, compare iterations, and prepare it for delivery.
+              The completed run opens on the results page, where you can refine
+              individual sections, copy the saved plan, download DOCX or PDF, or
+              deliver to Google Docs.
             </p>
           </div>
         </div>
@@ -58,8 +62,8 @@ export default async function GeneratePage({ params, searchParams }: PageProps) 
       <Panel className="p-7">
         <p className="text-2xl font-medium text-[var(--ink)]">Generate now</p>
         <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-          Choose a saved brief, optionally override the preset, and generate a structured
-          content plan.
+          Choose a saved brief, optionally override the preset, and generate the
+          first saved content plan for this workspace.
         </p>
         {error ? (
           <p className="mt-4 text-sm text-[var(--danger)]">
@@ -78,10 +82,17 @@ export default async function GeneratePage({ params, searchParams }: PageProps) 
             />
           ) : (
             <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
-              Save a brief first, then return here to generate content.
+              <p>Save a brief first, then return here to generate content.</p>
+              <p className="mt-3">
+                The fastest path is: create the brief in the workspace, generate
+                the run here, then use the results page for exports or Google
+                Docs delivery.
+              </p>
               <div className="mt-4">
-                <Link className="font-medium text-[var(--ink)]" href={`/app/workspaces/${workspace.id}`}>
-                  Open workspace brief intake
+                <Link href={`/app/workspaces/${workspace.id}`}>
+                  <span className="font-medium text-[var(--ink)]">
+                    Create first brief
+                  </span>
                 </Link>
               </div>
             </div>

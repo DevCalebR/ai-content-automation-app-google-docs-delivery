@@ -146,10 +146,12 @@ export function RunResultsToolbar({
       <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-5">
         <div>
           <p className="text-sm font-medium text-[var(--ink)]">
-            Export and reuse
+            Finish this run
           </p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Download a polished client-ready export or copy the full saved run.
+            Copy the saved run or download polished client-ready exports.
+            Accepted section refinements flow into every action here
+            automatically.
           </p>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
@@ -177,6 +179,16 @@ export function RunResultsToolbar({
             text={copyAllText}
             variant="secondary"
           />
+        </div>
+        <div className="mt-5 rounded-[1.5rem] border border-[var(--line)] bg-[var(--panel-strong)] p-4">
+          <p className="text-sm font-medium text-[var(--ink)]">
+            Need to polish one section before exporting?
+          </p>
+          <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
+            Use Refine with AI inside the section tabs below. Once you accept a
+            revision, the saved run, copy output, downloads, and Google Docs
+            delivery all stay in sync.
+          </p>
         </div>
         <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[var(--panel-strong)] p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--ink-soft)]">
@@ -211,7 +223,8 @@ export function RunResultsToolbar({
               Google Docs delivery
             </p>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              Deliver this run to the workspace Google Docs destination.
+              Deliver the current saved run, including accepted refinements, to
+              the workspace Google Docs destination.
             </p>
           </div>
           {latestDelivery ? (
@@ -241,21 +254,29 @@ export function RunResultsToolbar({
 
         {!googleDocsServerReady ? (
           <p className="mt-4 text-sm text-[var(--ink-soft)]">
-            Google Docs delivery is not configured on the server yet.
+            Google Docs delivery is not configured on the server yet. Add the
+            Google OAuth or service-account credentials before workspace
+            delivery setup can work.
           </p>
         ) : !googleDocsConnected ? (
           <p className="mt-4 text-sm text-[var(--ink-soft)]">
-            Set a shared Google Drive folder in workspace settings before
-            delivering a run.
+            Delivery is almost ready. Open delivery setup and save a folder
+            before this workspace can send runs to Google Docs.
           </p>
         ) : !isOwner ? (
           <p className="mt-4 text-sm text-[var(--ink-soft)]">
-            Only workspace owners can send runs to Google Docs.
+            Google Docs delivery is configured for this workspace, but only
+            owners can send the run. You can still copy or download the saved
+            plan.
           </p>
         ) : (
           <form action={deliveryAction} className="mt-5 space-y-4">
             <input name="workspaceId" type="hidden" value={workspaceId} />
             <input name="runId" type="hidden" value={runId} />
+            <p className="text-sm leading-7 text-[var(--ink-soft)]">
+              Delivery creates a document from the saved run shown on this page,
+              not an older draft.
+            </p>
             <FormStateMessage state={deliveryState} />
             {deliveryState.documentUrl ? (
               <a
@@ -277,10 +298,10 @@ export function RunResultsToolbar({
           </form>
         )}
 
-        {(!googleDocsConnected || !isOwner) && googleDocsServerReady ? (
+        {!googleDocsConnected || !isOwner || !googleDocsServerReady ? (
           <div className="mt-5">
             <Link href={settingsHref}>
-              <Button variant="secondary">Open delivery settings</Button>
+              <Button variant="secondary">Open delivery setup</Button>
             </Link>
           </div>
         ) : null}

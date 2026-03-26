@@ -24,9 +24,9 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 
 vi.mock("@/lib/workspaces/service", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/workspaces/service")>(
-    "@/lib/workspaces/service",
-  );
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspaces/service")
+  >("@/lib/workspaces/service");
 
   return {
     ...actual,
@@ -52,7 +52,8 @@ vi.mock("@/lib/google-docs/oauth", () => ({
 }));
 
 vi.mock("@/lib/logger", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger");
+  const actual =
+    await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger");
 
   return {
     ...actual,
@@ -130,27 +131,67 @@ describe("saveGoogleDocsConnectionAction", () => {
     integrationConnectionFindFirstMock.mockResolvedValue(null);
   });
 
+  it("returns field-specific validation errors and preserves entered values", async () => {
+    const { saveGoogleDocsConnectionAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsSettingsState } =
+      await import("@/lib/google-docs/state");
+    const formData = new FormData();
+    formData.set("workspaceId", "workspace-1");
+    formData.set("folderId", "");
+    formData.set(
+      "titlePrefix",
+      "This title prefix is intentionally made much longer than the allowed eighty characters for validation coverage.",
+    );
+
+    const result = await saveGoogleDocsConnectionAction(
+      initialGoogleDocsSettingsState,
+      formData,
+    );
+
+    expect(result).toEqual({
+      status: "error",
+      message: "Please correct the highlighted fields.",
+      values: {
+        folderId: "",
+        titlePrefix:
+          "This title prefix is intentionally made much longer than the allowed eighty characters for validation coverage.",
+      },
+      fieldErrors: {
+        folderId: "Enter a Google Drive folder ID.",
+        titlePrefix: "Keep the document title prefix under 80 characters.",
+      },
+    });
+    expect(validateGoogleDocsFolderAccessMock).not.toHaveBeenCalled();
+  });
+
   it("connects a workspace folder after validating access", async () => {
     validateGoogleDocsFolderAccessMock.mockResolvedValue({
       folderId: "folder-123",
       folderName: "Content Delivery",
     });
 
-    const { saveGoogleDocsConnectionAction } = await import(
-      "@/app/(app)/app/actions"
-    );
-    const { initialGoogleDocsSettingsState } = await import("@/lib/google-docs/state");
+    const { saveGoogleDocsConnectionAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsSettingsState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("folderId", "folder-123");
     formData.set("titlePrefix", "North Star");
 
-    const result = await saveGoogleDocsConnectionAction(initialGoogleDocsSettingsState, formData);
+    const result = await saveGoogleDocsConnectionAction(
+      initialGoogleDocsSettingsState,
+      formData,
+    );
 
-    expect(validateGoogleDocsFolderAccessMock).toHaveBeenCalledWith("folder-123", {
-      authMode: "SERVICE_ACCOUNT",
-      driveClient: expect.any(Object),
-    });
+    expect(validateGoogleDocsFolderAccessMock).toHaveBeenCalledWith(
+      "folder-123",
+      {
+        authMode: "SERVICE_ACCOUNT",
+        driveClient: expect.any(Object),
+      },
+    );
     expect(integrationConnectionUpsertMock).toHaveBeenCalledWith({
       where: {
         workspaceId_provider: {
@@ -173,7 +214,9 @@ describe("saveGoogleDocsConnectionAction", () => {
         encryptedRefreshToken: null,
       }),
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/app/workspaces/workspace-1/settings");
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      "/app/workspaces/workspace-1/settings",
+    );
     expect(result).toEqual({
       status: "success",
       message: "Google Docs delivery is connected to Content Delivery.",
@@ -181,6 +224,7 @@ describe("saveGoogleDocsConnectionAction", () => {
         folderId: "folder-123",
         titlePrefix: "North Star",
       },
+      fieldErrors: {},
     });
   });
 
@@ -202,17 +246,20 @@ describe("saveGoogleDocsConnectionAction", () => {
       folderName: "Founder Drive",
     });
 
-    const { saveGoogleDocsConnectionAction } = await import(
-      "@/app/(app)/app/actions"
-    );
-    const { initialGoogleDocsSettingsState } = await import("@/lib/google-docs/state");
+    const { saveGoogleDocsConnectionAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsSettingsState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("authMode", "USER_OAUTH");
     formData.set("folderId", "folder-my-drive");
     formData.set("titlePrefix", "North Star");
 
-    const result = await saveGoogleDocsConnectionAction(initialGoogleDocsSettingsState, formData);
+    const result = await saveGoogleDocsConnectionAction(
+      initialGoogleDocsSettingsState,
+      formData,
+    );
 
     expect(getStoredGoogleOAuthTokensMock).toHaveBeenCalledWith({
       status: "NOT_CONNECTED",
@@ -222,10 +269,13 @@ describe("saveGoogleDocsConnectionAction", () => {
         oauthConnectedAt: "2026-03-23T12:00:00.000Z",
       },
     });
-    expect(validateGoogleDocsFolderAccessMock).toHaveBeenCalledWith("folder-my-drive", {
-      authMode: "USER_OAUTH",
-      driveClient: expect.any(Object),
-    });
+    expect(validateGoogleDocsFolderAccessMock).toHaveBeenCalledWith(
+      "folder-my-drive",
+      {
+        authMode: "USER_OAUTH",
+        driveClient: expect.any(Object),
+      },
+    );
     expect(buildStoredGoogleOAuthTokensMock).toHaveBeenCalledWith(
       {
         access_token: "refreshed-access",
@@ -261,22 +311,26 @@ describe("saveGoogleDocsConnectionAction", () => {
         folderId: "folder-my-drive",
         titlePrefix: "North Star",
       },
+      fieldErrors: {},
     });
   });
 
   it("returns a safe error when the server is not configured for delivery", async () => {
     hasGoogleDocsServiceAccountConfigMock.mockReturnValue(false);
 
-    const { saveGoogleDocsConnectionAction } = await import(
-      "@/app/(app)/app/actions"
-    );
-    const { initialGoogleDocsSettingsState } = await import("@/lib/google-docs/state");
+    const { saveGoogleDocsConnectionAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsSettingsState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("folderId", "folder-123");
     formData.set("titlePrefix", "North Star");
 
-    const result = await saveGoogleDocsConnectionAction(initialGoogleDocsSettingsState, formData);
+    const result = await saveGoogleDocsConnectionAction(
+      initialGoogleDocsSettingsState,
+      formData,
+    );
 
     expect(validateGoogleDocsFolderAccessMock).not.toHaveBeenCalled();
     expect(integrationConnectionUpsertMock).not.toHaveBeenCalled();
@@ -285,6 +339,7 @@ describe("saveGoogleDocsConnectionAction", () => {
       folderId: "folder-123",
       titlePrefix: "North Star",
     });
+    expect(result.fieldErrors).toEqual({});
   });
 
   it("preserves the submitted values when folder validation fails", async () => {
@@ -294,16 +349,19 @@ describe("saveGoogleDocsConnectionAction", () => {
       ),
     );
 
-    const { saveGoogleDocsConnectionAction } = await import(
-      "@/app/(app)/app/actions"
-    );
-    const { initialGoogleDocsSettingsState } = await import("@/lib/google-docs/state");
+    const { saveGoogleDocsConnectionAction } =
+      await import("@/app/(app)/app/actions");
+    const { initialGoogleDocsSettingsState } =
+      await import("@/lib/google-docs/state");
     const formData = new FormData();
     formData.set("workspaceId", "workspace-1");
     formData.set("folderId", "folder-private");
     formData.set("titlePrefix", "North Star");
 
-    const result = await saveGoogleDocsConnectionAction(initialGoogleDocsSettingsState, formData);
+    const result = await saveGoogleDocsConnectionAction(
+      initialGoogleDocsSettingsState,
+      formData,
+    );
 
     expect(integrationConnectionUpsertMock).toHaveBeenCalledWith({
       where: {
@@ -327,6 +385,7 @@ describe("saveGoogleDocsConnectionAction", () => {
         folderId: "folder-private",
         titlePrefix: "North Star",
       },
+      fieldErrors: {},
     });
   });
 });

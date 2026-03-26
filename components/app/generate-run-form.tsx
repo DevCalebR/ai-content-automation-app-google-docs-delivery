@@ -20,7 +20,10 @@ export function GenerateRunForm({
     <form className="space-y-5" action={generateRunAction}>
       <input type="hidden" name="workspaceId" value={workspaceId} />
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[var(--ink-soft)]" htmlFor="briefId">
+        <label
+          className="text-sm font-medium text-[var(--ink-soft)]"
+          htmlFor="briefId"
+        >
           Source brief
         </label>
         <Select defaultValue={defaultBrief} id="briefId" name="briefId">
@@ -30,9 +33,16 @@ export function GenerateRunForm({
             </option>
           ))}
         </Select>
+        <p className="text-xs leading-6 text-[var(--ink-soft)]">
+          Start from a saved brief so the generated run stays reusable and
+          attached to the right workspace context.
+        </p>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[var(--ink-soft)]" htmlFor="presetId">
+        <label
+          className="text-sm font-medium text-[var(--ink-soft)]"
+          htmlFor="presetId"
+        >
           Override preset
         </label>
         <Select defaultValue="" id="presetId" name="presetId">
@@ -43,8 +53,18 @@ export function GenerateRunForm({
             </option>
           ))}
         </Select>
+        <p className="text-xs leading-6 text-[var(--ink-soft)]">
+          Leave this on the saved brief preset unless this run needs a different
+          voice or structure.
+        </p>
       </div>
-      <SubmitButton pendingLabel="Generating plan...">Generate structured plan</SubmitButton>
+      <SubmitButton pendingLabel="Generating plan...">
+        Generate saved content plan
+      </SubmitButton>
+      <p className="text-xs leading-6 text-[var(--ink-soft)]">
+        After generation, you will land on the results page to refine sections,
+        copy the full run, download DOCX or PDF, or deliver it to Google Docs.
+      </p>
     </form>
   );
 }
