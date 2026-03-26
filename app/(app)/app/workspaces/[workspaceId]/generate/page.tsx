@@ -35,26 +35,27 @@ export default async function GeneratePage({
       <Panel className="p-7">
         <p className="section-heading">Generation</p>
         <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
-          Launch a structured content plan from a saved brief.
+          Create a polished content plan from a saved brief.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Run a server-side OpenAI workflow that turns a saved brief into a
-          structured content plan you can review, refine, export, and deliver.
+          Start from a saved brief and generate a campaign summary, content calendar,
+          captions, hashtags, and image prompts you can review, refine, export, and
+          deliver.
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5">
-            <p className="font-medium text-[var(--ink)]">Stored result shape</p>
+            <p className="font-medium text-[var(--ink)]">What each run includes</p>
             <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-              Campaign summary, calendar entries, sample captions, hashtag sets,
-              and image prompts are normalized into a structured output record.
+              Each saved plan includes a campaign summary, content calendar, sample
+              captions, hashtag groups, and image prompts in one reusable deliverable.
             </p>
           </div>
           <div className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-5">
             <p className="font-medium text-[var(--ink)]">What happens next</p>
             <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-              The completed run opens on the results page, where you can refine
-              individual sections, copy the saved plan, download DOCX or PDF, or
-              deliver to Google Docs.
+              The finished run opens on the results page, where you can refine
+              sections, copy the saved plan, download DOCX or PDF, or deliver it to
+              Google Docs.
             </p>
           </div>
         </div>
@@ -69,7 +70,7 @@ export default async function GeneratePage({
           <p className="mt-4 text-sm text-[var(--danger)]">
             {error === "rate-limited"
               ? "Generation is temporarily rate limited. Try again shortly."
-              : "We couldn’t start generation. Check that the selected brief still exists."}
+              : "We couldn’t start this run. Check that the selected brief still exists, then try again."}
           </p>
         ) : null}
         <div className="mt-8">
@@ -84,9 +85,8 @@ export default async function GeneratePage({
             <div className="rounded-[1.75rem] border border-dashed border-[var(--line)] bg-white/60 p-6 text-sm text-[var(--ink-soft)]">
               <p>Save a brief first, then return here to generate content.</p>
               <p className="mt-3">
-                The fastest path is: create the brief in the workspace, generate
-                the run here, then use the results page for exports or Google
-                Docs delivery.
+                The fastest path is: create the brief in the workspace, generate the
+                plan here, then use the results page for exports or Google Docs delivery.
               </p>
               <div className="mt-4">
                 <Link href={`/app/workspaces/${workspace.id}`}>

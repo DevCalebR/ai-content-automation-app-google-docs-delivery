@@ -134,6 +134,11 @@ export function RunResultsToolbar({
     deliverRunToGoogleDocsAction,
     initialGoogleDocsDeliveryState,
   );
+  const deliverySetupLabel = !isOwner
+    ? "View delivery setup"
+    : !googleDocsServerReady || !googleDocsConnected
+      ? "Finish delivery setup"
+      : "Review delivery settings";
 
   useEffect(() => {
     if (deliveryState.status !== "idle") {
@@ -146,12 +151,11 @@ export function RunResultsToolbar({
       <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-5">
         <div>
           <p className="text-sm font-medium text-[var(--ink)]">
-            Finish this run
+            Export and share
           </p>
           <p className="mt-1 text-sm text-[var(--ink-soft)]">
-            Copy the saved run or download polished client-ready exports.
-            Accepted section refinements flow into every action here
-            automatically.
+            Download ready-to-share files or copy the saved content plan. Accepted
+            section refinements are included in every action here automatically.
           </p>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
@@ -172,9 +176,9 @@ export function RunResultsToolbar({
             priority="primary"
           />
           <CopyTextButton
-            buttonLabel="Copy full run"
-            label="Copied all results."
-            pendingButtonLabel="Copied full run"
+            buttonLabel="Copy content plan"
+            label="Copied content plan."
+            pendingButtonLabel="Copied content plan"
             size="default"
             text={copyAllText}
             variant="secondary"
@@ -185,9 +189,9 @@ export function RunResultsToolbar({
             Need to polish one section before exporting?
           </p>
           <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-            Use Refine with AI inside the section tabs below. Once you accept a
-            revision, the saved run, copy output, downloads, and Google Docs
-            delivery all stay in sync.
+            Use Refine with AI inside each supported section below. Once you accept a
+            revision, the saved plan, downloads, copy output, and Google Docs delivery
+            all stay in sync.
           </p>
         </div>
         <div className="mt-6 rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[var(--panel-strong)] p-4">
@@ -195,7 +199,8 @@ export function RunResultsToolbar({
             Advanced exports
           </p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Keep markdown or plain text handy for technical workflows.
+            Keep markdown or plain text available when you need a lightweight source
+            file.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <DownloadAction
@@ -220,11 +225,11 @@ export function RunResultsToolbar({
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">
-              Google Docs delivery
+              Deliver to Google Docs
             </p>
             <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              Deliver the current saved run, including accepted refinements, to
-              the workspace Google Docs destination.
+              Create a Google Doc from the current saved content plan, including any
+              accepted refinements.
             </p>
           </div>
           {latestDelivery ? (
@@ -254,28 +259,27 @@ export function RunResultsToolbar({
 
         {!googleDocsServerReady ? (
           <p className="mt-4 text-sm text-[var(--ink-soft)]">
-            Google Docs delivery is not configured on the server yet. Add the
-            Google OAuth or service-account credentials before workspace
-            delivery setup can work.
+            Google Docs delivery still needs to be configured before this workspace
+            can use it.
           </p>
         ) : !googleDocsConnected ? (
           <p className="mt-4 text-sm text-[var(--ink-soft)]">
-            Delivery is almost ready. Open delivery setup and save a folder
-            before this workspace can send runs to Google Docs.
+            Delivery is almost ready. Finish the workspace delivery setup, save a
+            folder, and then return here to send this content plan to Google Docs.
           </p>
         ) : !isOwner ? (
           <p className="mt-4 text-sm text-[var(--ink-soft)]">
             Google Docs delivery is configured for this workspace, but only
-            owners can send the run. You can still copy or download the saved
-            plan.
+            owners can send the plan. You can still copy or download the saved
+            content plan.
           </p>
         ) : (
           <form action={deliveryAction} className="mt-5 space-y-4">
             <input name="workspaceId" type="hidden" value={workspaceId} />
             <input name="runId" type="hidden" value={runId} />
             <p className="text-sm leading-7 text-[var(--ink-soft)]">
-              Delivery creates a document from the saved run shown on this page,
-              not an older draft.
+              Delivery uses the exact saved content plan shown on this page, not an
+              older draft.
             </p>
             <FormStateMessage state={deliveryState} />
             {deliveryState.documentUrl ? (
@@ -301,7 +305,7 @@ export function RunResultsToolbar({
         {!googleDocsConnected || !isOwner || !googleDocsServerReady ? (
           <div className="mt-5">
             <Link href={settingsHref}>
-              <Button variant="secondary">Open delivery setup</Button>
+              <Button variant="secondary">{deliverySetupLabel}</Button>
             </Link>
           </div>
         ) : null}

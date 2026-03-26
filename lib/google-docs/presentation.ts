@@ -43,7 +43,7 @@ export function getGoogleDocsNotice(status?: string) {
       return {
         tone: "error" as const,
         message:
-          "Google returned access without a durable refresh token. Reconnect the Google account and approve the requested access again before using My Drive delivery.",
+          "Google approved the account, but the connection is missing the background access needed for ongoing delivery. Reconnect the Google account and approve access again before using My Drive delivery.",
       };
     default:
       return null;
@@ -100,9 +100,9 @@ export function getDeliveryStatus(input: DeliveryStatusInput): DeliveryStatus {
     return {
       badge: "Ready with service account",
       summary:
-        "Completed runs will be delivered through the workspace service account configuration.",
+        "Completed runs will be delivered through the workspace service account.",
       nextStep:
-        "Use this mode for shared-folder delivery while My Drive OAuth rollout is still in progress.",
+        "Use this mode when you need shared-folder or shared-drive delivery.",
       technical: "SERVICE_ACCOUNT",
     };
   }
@@ -144,9 +144,9 @@ export function getDeliveryStatus(input: DeliveryStatusInput): DeliveryStatus {
     return {
       badge: "Service account available",
       summary:
-        "The legacy service-account delivery path is available, but this workspace does not have an active folder configured.",
+        "Shared-folder delivery is available through the workspace service account, but this workspace does not have a folder saved yet.",
       nextStep:
-        "Use the shared-folder section below if you need the service-account path while OAuth rollout is still in progress.",
+        "Use the shared-folder section below if you want to deliver into a shared folder or shared drive.",
       technical: "SERVICE_ACCOUNT_READY",
     };
   }
@@ -154,9 +154,9 @@ export function getDeliveryStatus(input: DeliveryStatusInput): DeliveryStatus {
   return {
     badge: "Needs server setup",
     summary:
-      "Google Docs delivery is unavailable because the server is missing both the Google OAuth app configuration and the service-account credentials used by the legacy delivery path.",
+      "Google Docs delivery is unavailable because this environment is missing both Google account setup and the workspace service-account credentials.",
     nextStep:
-      "Add either the Google OAuth client ID and secret for My Drive delivery, or the service-account credentials for the shared-folder fallback.",
+      "Add either the Google OAuth client ID and secret for My Drive delivery, or the service-account credentials for shared-folder delivery.",
     technical: "SERVER_NOT_CONFIGURED",
   };
 }
@@ -177,7 +177,7 @@ export function getDeliveryReadinessItems(
             ready: true,
             label: "Service account delivery path is selected",
             detail:
-              "Completed runs will use the shared-folder workflow after the folder is confirmed below.",
+              "Completed runs will use the workspace service account after the folder is confirmed below.",
           }
         : {
             ready: false,
@@ -212,7 +212,7 @@ export function getDeliveryReadinessItems(
               ready: false,
               label: "Reconnect the Google account to finish My Drive setup",
               detail:
-                "The current connection is missing the refresh token needed for durable delivery.",
+                "The current connection is missing the background access needed to keep delivering reliably.",
             }
           : {
               ready: false,
@@ -224,7 +224,7 @@ export function getDeliveryReadinessItems(
         ? input.serviceAccountReady
           ? {
               ready: true,
-              label: "The server service account is configured",
+              label: "The workspace service account is configured",
               detail:
                 "Share the target folder with the service account email shown below before delivering a run.",
             }

@@ -19,7 +19,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "AI Content Automation App with Google Docs Delivery",
   description:
-    "Production-ready content automation workspace for briefs, presets, generation runs, and Google Docs delivery readiness.",
+    "Create polished monthly content plans from saved briefs, then export DOCX or PDF or deliver them to Google Docs.",
 };
 
 export default async function RootLayout({

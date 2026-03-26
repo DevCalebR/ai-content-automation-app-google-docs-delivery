@@ -86,7 +86,7 @@ export function SignUpForm() {
           id="email"
           name="email"
           onChange={(event) => updateValue("email", event.target.value)}
-          placeholder="operator@company.com"
+          placeholder="team@company.com"
           required
           type="email"
           value={values.email}

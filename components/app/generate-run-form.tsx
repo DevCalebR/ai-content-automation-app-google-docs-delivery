@@ -34,8 +34,7 @@ export function GenerateRunForm({
           ))}
         </Select>
         <p className="text-xs leading-6 text-[var(--ink-soft)]">
-          Start from a saved brief so the generated run stays reusable and
-          attached to the right workspace context.
+          Choose the saved brief you want this content plan to follow.
         </p>
       </div>
       <div className="space-y-2">
@@ -62,8 +61,8 @@ export function GenerateRunForm({
         Generate saved content plan
       </SubmitButton>
       <p className="text-xs leading-6 text-[var(--ink-soft)]">
-        After generation, you will land on the results page to refine sections,
-        copy the full run, download DOCX or PDF, or deliver it to Google Docs.
+        After generation, you will land on the results page to review the plan,
+        refine sections, export it, or deliver it to Google Docs.
       </p>
     </form>
   );

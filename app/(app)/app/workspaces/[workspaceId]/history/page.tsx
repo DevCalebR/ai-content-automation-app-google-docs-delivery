@@ -34,9 +34,8 @@ export default async function HistoryPage({ params }: PageProps) {
           Every generation attempt stays attached to {workspace.name}.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Use history to revisit results, confirm which brief and preset
-          produced each structured output, and reopen completed runs for exports
-          or delivery.
+          Use history to reopen finished content plans, confirm which brief and preset
+          produced each run, and return to exports or delivery whenever you need them.
         </p>
       </Panel>
       <Panel className="p-7">
@@ -92,7 +91,7 @@ export default async function HistoryPage({ params }: PageProps) {
                       href={`/app/workspaces/${workspace.id}/results/${run.id}`}
                     >
                       <span className="text-sm font-medium text-[var(--ink)]">
-                        Open results
+                        Open plan
                       </span>
                     </Link>
                     <Link

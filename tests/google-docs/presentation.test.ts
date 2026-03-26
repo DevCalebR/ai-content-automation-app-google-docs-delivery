@@ -77,7 +77,7 @@ describe("google docs presentation helpers", () => {
     expect(getGoogleDocsNotice("oauth-refresh-required")).toEqual({
       tone: "error",
       message:
-        "Google returned access without a durable refresh token. Reconnect the Google account and approve the requested access again before using My Drive delivery.",
+        "Google approved the account, but the connection is missing the background access needed for ongoing delivery. Reconnect the Google account and approve access again before using My Drive delivery.",
     });
   });
 });

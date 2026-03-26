@@ -17,19 +17,19 @@ export default async function SignUpPage() {
         <div className="rounded-[3rem] border border-[var(--line)] bg-[rgba(255,250,243,0.74)] p-8">
           <p className="section-heading">Account setup</p>
           <h1 className="mt-5 max-w-xl text-5xl font-medium tracking-[-0.05em] text-[var(--ink)]">
-            Create the operating account for durable content planning.
+            Start producing polished monthly content plans from one clear brief.
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-8 text-[var(--ink-soft)]">
-            You’ll start with workspace onboarding, reusable presets, structured brief
-            intake, and a saved run/results shell built on durable Postgres persistence.
-            New credential accounts now verify email before first sign-in.
+            Create a workspace for each brand or client, save reusable briefs, generate
+            finished content plans, then export DOCX or PDF or deliver straight to
+            Google Docs. New accounts verify email before first sign-in.
           </p>
         </div>
         <Panel className="p-8">
           <p className="text-2xl font-medium text-[var(--ink)]">Create account</p>
           <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-            Start with verified email/password auth and add more providers later without
-            changing the workspace data model.
+            Use your work email to get started. After verification, you can create your
+            first workspace and begin generating deliverables right away.
           </p>
           <div className="mt-8">
             <SignUpForm />

@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div>
               <p className="text-sm font-medium text-[var(--ink)]">Signed in as {session.user.email}</p>
               <p className="text-xs text-[var(--ink-soft)]">
-                Durable workspace storage, generation history, and OpenAI-backed results.
+                Saved workspaces, recent runs, and ready-to-share content plans.
               </p>
             </div>
             <div className="flex items-center gap-3">

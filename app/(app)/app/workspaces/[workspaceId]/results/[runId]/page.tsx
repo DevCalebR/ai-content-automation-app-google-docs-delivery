@@ -91,16 +91,14 @@ export default async function ResultsPage({ params }: PageProps) {
       <Panel className="p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="section-heading">Results workspace</p>
+            <p className="section-heading">Saved content plan</p>
             <h1 className="mt-4 text-4xl font-medium tracking-[-0.04em] text-[var(--ink)]">
               {run.brief.businessName}
             </h1>
             <p className="mt-3 text-base leading-8 text-[var(--ink-soft)]">
               Generated {formatShortDate(run.createdAt)} with {run.model}.
-              Review the campaign summary, calendar, captions, hashtags, and
-              image prompts for this run in one place, then copy it, download
-              DOCX or PDF, deliver it to Google Docs, or refine individual
-              sections below.
+              Review the full deliverable in one place, refine any supported section,
+              then copy it, download DOCX or PDF, or deliver it to Google Docs.
             </p>
           </div>
           <Badge>{run.status}</Badge>
@@ -124,7 +122,7 @@ export default async function ResultsPage({ params }: PageProps) {
           </p>
           <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
             {run.errorMessage ||
-              "The generation attempt did not complete. Review the brief, environment variables, and OpenAI connectivity before retrying."}
+              "This run did not complete successfully. Review the brief and workspace setup, then try again."}
           </p>
         </Panel>
       ) : null}
@@ -158,7 +156,7 @@ export default async function ResultsPage({ params }: PageProps) {
         <Panel className="p-7">
           <p className="text-sm text-[var(--ink-soft)]">
             {exportContentErrorMessage ??
-              "This run has not written a structured output yet."}
+              "This run does not have a saved content plan yet."}
           </p>
         </Panel>
       ) : null}

@@ -36,7 +36,7 @@ export function SignInFormFields({
       });
 
       if (!result || result.error) {
-        setError("We couldn’t sign you in with those credentials.");
+        setError("We couldn’t sign you in with that email and password.");
         return;
       }
 
@@ -55,7 +55,7 @@ export function SignInFormFields({
           id="email"
           name="email"
           type="email"
-          placeholder="operator@company.com"
+          placeholder="team@company.com"
           required
         />
       </div>

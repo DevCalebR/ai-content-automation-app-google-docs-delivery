@@ -7,9 +7,9 @@ import { Panel } from "@/components/ui/panel";
 import { authOptions } from "@/lib/auth/options";
 
 const highlights = [
-  "Structured briefs with reusable presets",
-  "Saved generation runs and results workspace",
-  "OpenAI Responses API boundary with durable persistence",
+  "Reusable briefs and presets for every client",
+  "Saved content plans with run history",
+  "DOCX, PDF, copy, and Google Docs delivery",
 ];
 
 export default async function MarketingPage() {
@@ -26,7 +26,9 @@ export default async function MarketingPage() {
             <p className="text-sm font-medium text-[var(--ink)]">
               AI Content Automation App with Google Docs Delivery
             </p>
-            <p className="text-xs text-[var(--ink-soft)]">Structured content operations</p>
+            <p className="text-xs text-[var(--ink-soft)]">
+              Client-ready monthly content plans
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -44,14 +46,14 @@ export default async function MarketingPage() {
           <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-[rgba(190,92,58,0.18)] blur-3xl" />
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] lg:items-end">
             <div className="max-w-3xl">
-              <Badge className="bg-white/70">Production architecture first</Badge>
+              <Badge className="bg-white/70">Built for polished client delivery</Badge>
               <h1 className="mt-6 max-w-4xl text-5xl font-medium leading-[1.02] tracking-[-0.05em] text-[var(--ink)] md:text-7xl">
-                Turn one disciplined brief into a durable monthly content engine.
+                Turn one clear brief into a polished monthly content plan.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--ink-soft)]">
-                Built for teams that need reusable presets, durable brief storage, saved
-                run history, and an OpenAI-powered workflow for producing organized monthly
-                content.
+                Built for teams that need reusable briefs, saved history, section-level
+                refinements, and ready-to-share deliverables without rebuilding the same
+                monthly plan by hand.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href={session ? "/app" : "/sign-up"}>
@@ -62,7 +64,7 @@ export default async function MarketingPage() {
                 </Link>
                 <Link href="#foundation">
                   <Button size="lg" variant="secondary">
-                    View workflow
+                    See how it works
                   </Button>
                 </Link>
               </div>
@@ -80,18 +82,20 @@ export default async function MarketingPage() {
 
             <Panel className="relative overflow-hidden p-6">
               <div className="rounded-[1.75rem] bg-[var(--ink)] p-5 text-[var(--surface-strong)]">
-                <p className="section-heading !text-[rgba(255,250,243,0.65)]">Run output</p>
+                <p className="section-heading !text-[rgba(255,250,243,0.65)]">
+                  Sample deliverable
+                </p>
                 <p className="mt-4 text-2xl font-medium">April pipeline acceleration</p>
                 <p className="mt-2 text-sm leading-7 text-[rgba(255,250,243,0.75)]">
                   Campaign summary, sample calendar, captions, hashtags, and image prompts
-                  with every run saved to durable history.
+                  with every run saved for revisions, exports, and Google Docs delivery.
                 </p>
               </div>
               <div className="mt-5 space-y-3">
                 {[
-                  "Workspace ownership and membership",
-                  "Structured brief intake and versioned runs",
-                  "Results tabs for organized review",
+                  "Reusable briefs and shared workspace context",
+                  "Section-level review and refinement",
+                  "DOCX, PDF, copy, and Google Docs delivery",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-3 rounded-[1.5rem] bg-white p-4">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 text-[var(--success)]" />
@@ -109,18 +113,18 @@ export default async function MarketingPage() {
           {[
             {
               icon: Layers3,
-              title: "Production data model",
-              body: "Users, workspaces, briefs, runs, structured outputs, usage events, and integration placeholders all live in Prisma-backed persistence.",
+              title: "Built for repeatable planning",
+              body: "Keep each brand or client organized with reusable briefs, saved runs, and one place to return when the next monthly plan is due.",
             },
             {
               icon: Sparkles,
-              title: "OpenAI-ready service boundary",
-              body: "Prompt composition, safety checks, schema enforcement, and result normalization are isolated server-side and ready for broader output categories.",
+              title: "Polished deliverables out of the box",
+              body: "Every completed run is ready to review on screen, copy, download as DOCX or PDF, or send straight to Google Docs.",
             },
             {
               icon: CheckCircle2,
-              title: "Real SaaS operating shell",
-              body: "Auth, onboarding, dashboard, generation, history, results, and settings work together as one coherent operator workflow.",
+              title: "One clear workflow for the whole team",
+              body: "Onboarding, workspace setup, generation, export, and delivery all work together in one customer-ready app experience.",
             },
           ].map((item) => (
             <Panel key={item.title} className="p-6">

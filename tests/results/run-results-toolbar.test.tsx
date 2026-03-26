@@ -49,11 +49,11 @@ describe("RunResultsToolbar", () => {
 
     expect(markup).toContain("Download DOCX");
     expect(markup).toContain("Download PDF");
-    expect(markup).toContain("Copy full run");
+    expect(markup).toContain("Copy content plan");
     expect(markup).toContain("Advanced exports");
     expect(markup).toContain("Deliver to Google Docs");
     expect(markup).toContain(
-      "Use Refine with AI inside the section tabs below.",
+      "Use Refine with AI inside each supported section below.",
     );
   });
 
@@ -75,10 +75,34 @@ describe("RunResultsToolbar", () => {
       />,
     );
 
-    expect(markup).toContain("Open delivery setup");
+    expect(markup).toContain("Finish delivery setup");
     expect(markup).toContain(
-      "Open delivery setup and save a folder before this workspace can send runs to Google Docs.",
+      "Finish the workspace delivery setup, save a folder, and then return here to send this content plan to Google Docs.",
     );
     expect(markup).not.toContain("Deliver to Google Docs</span>");
+  });
+
+  it("shows a view-only delivery action label for non-owners", () => {
+    const markup = renderToStaticMarkup(
+      <RunResultsToolbar
+        copyAllText="Full run copy"
+        docxDownloadUrl="/docx"
+        googleDocsConnected={true}
+        googleDocsServerReady={true}
+        isOwner={false}
+        latestDelivery={null}
+        markdownDownloadUrl="/markdown"
+        pdfDownloadUrl="/pdf"
+        runId="run-1"
+        settingsHref="/settings"
+        textDownloadUrl="/text"
+        workspaceId="workspace-1"
+      />,
+    );
+
+    expect(markup).toContain("View delivery setup");
+    expect(markup).toContain(
+      "only owners can send the plan. You can still copy or download the saved",
+    );
   });
 });

@@ -110,8 +110,8 @@ export default async function SettingsPage({
           Manage workspace settings
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--ink-soft)]">
-          Owners can update workspace details here, while members have read-only
-          visibility into the current workspace setup.
+          Owners can update workspace details here. Everyone else can review the
+          current setup and delivery readiness.
         </p>
         <div className="mt-6">
           <Badge>
@@ -138,9 +138,8 @@ export default async function SettingsPage({
           <Badge>{deliveryStatus.badge}</Badge>
         </div>
         <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
-          Connect Google Docs delivery for this workspace, choose the active
-          delivery path, and save the folder that should receive finished
-          content plans.
+          Choose how this workspace delivers finished content plans to Google Docs
+          and confirm which folder should receive them.
         </p>
         <div className="mt-5 rounded-[1.75rem] border border-[var(--line)] bg-[var(--panel-strong)] p-5">
           <p className="font-medium text-[var(--ink)]">
@@ -207,9 +206,9 @@ export default async function SettingsPage({
                   My Drive delivery via Google account
                 </p>
                 <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-                  Recommended for My Drive folders. The workspace owner connects
-                  a Google account, then the app creates Google Docs directly
-                  inside that user’s chosen folder.
+                  Recommended when one Google account owns the destination folder.
+                  The workspace owner connects that account, then the app creates
+                  Google Docs directly inside the chosen My Drive folder.
                 </p>
               </div>
               {activeMode === "USER_OAUTH" && connectionMetadata ? (
@@ -220,7 +219,7 @@ export default async function SettingsPage({
               <p className="font-medium text-[var(--ink)]">
                 {oauthConnected
                   ? oauthRefreshReady
-                    ? "Google account access is connected."
+                    ? "Google account connection is ready."
                     : "Reconnect the Google account to finish setup."
                   : "Google account is not connected yet."}
               </p>
@@ -228,7 +227,7 @@ export default async function SettingsPage({
                 {oauthConnected
                   ? oauthRefreshReady
                     ? "After a folder is saved below, completed runs will use the connected Google account to create documents in that Drive location."
-                    : "The current Google connection is missing the refresh token needed for durable delivery. Reconnect the account before saving or delivering to My Drive."
+                    : "The current Google connection is missing the background access needed for reliable delivery. Reconnect the account before saving or delivering to My Drive."
                   : "Connect a Google account first, then save the folder ID you want to receive delivered documents."}
               </p>
               {authorization.isOwner ? (
@@ -280,9 +279,8 @@ export default async function SettingsPage({
                   Service account delivery
                 </p>
                 <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-                  Keep this path for the current shared-folder workflow. It
-                  remains useful for shared-drive delivery while OAuth rollout
-                  is still in progress.
+                  Use this option when you want to deliver into a shared folder or
+                  shared drive through the workspace service account.
                 </p>
               </div>
               {activeMode === "SERVICE_ACCOUNT" && connectionMetadata ? (
@@ -297,7 +295,7 @@ export default async function SettingsPage({
                 <>
                   <p className="mt-2 leading-7">
                     Share the target folder with this service account when you
-                    want to use the legacy shared-folder delivery path.
+                    want to use shared-folder delivery.
                   </p>
                   <p className="mt-3 rounded-2xl bg-white/80 px-4 py-3 font-medium text-[var(--ink)]">
                     {serviceAccountEmail}
