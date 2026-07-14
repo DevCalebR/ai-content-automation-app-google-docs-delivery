@@ -1,10 +1,11 @@
-# Screenshot plan
+# Verified screenshot inventory
 
-Use synthetic content and a dedicated test Google account.
+The committed captures were produced locally from the opt-in seed account and synthetic `North Star Media` workspace. No Google account or OpenAI request was used.
 
-1. `brief-workspace.png` — a complete structured brief with no personal or client data.
-2. `generation-results.png` — saved structured output and section-level actions.
-3. `delivery-settings.png` — Google delivery mode with all account identifiers redacted.
-4. `google-doc-delivered.png` — the generated document in a test folder with a synthetic title.
+1. `marketing-desktop.png` — product overview at 1440 × 1000.
+2. `marketing-mobile.png` — product overview at 390 × 844.
+3. `dashboard-seeded-workspace-desktop.png` — seeded workspace counts and run status.
+4. `workspace-brief-desktop.png` — structured brief and saved-brief interface.
+5. `workspace-brief-mobile.png` — the same workspace at 390 × 844.
 
-Capture desktop views at 1440 pixels wide and one 390-pixel results view. Never show API keys, OAuth tokens, email addresses, Drive folder IDs, browser password-manager UI, or real campaign content.
+Generation-result, delivery-settings, and delivered-document captures remain intentionally absent until the blocked deployment and external-provider workflow can be verified. No API keys, OAuth tokens, Drive folder IDs, password-manager UI, or customer content appears.

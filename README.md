@@ -29,7 +29,13 @@ Content teams often move manually between intake forms, prompts, chat tools, rev
 
 ## Screenshots
 
-A verified screenshot set is intentionally not included yet. Capture only synthetic workspaces and generated sample content using the brief in [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md); do not publish OAuth account details, tokens, or real customer content.
+These local captures use the opt-in seeded demo account and synthetic `North Star Media` workspace. They demonstrate intake and workspace organization only; they do not claim verified OpenAI generation or Google Docs delivery while deployment verification remains blocked.
+
+| Product overview | Seeded workspace and brief |
+| --- | --- |
+| ![AI content automation product overview](docs/assets/screenshots/marketing-desktop.png) | ![Synthetic content workspace](docs/assets/screenshots/workspace-brief-desktop.png) |
+
+[View the seeded dashboard](docs/assets/screenshots/dashboard-seeded-workspace-desktop.png), [mobile product overview](docs/assets/screenshots/marketing-mobile.png), and [mobile workspace](docs/assets/screenshots/workspace-brief-mobile.png). Safety boundaries are documented in [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md).
 
 ## Architecture
 
