@@ -1,70 +1,66 @@
-<div align="center">
-
 # AI Content Automation with Google Docs Delivery
 
-### Move from a structured brief to an editable document without losing review control.
+**Code and architecture case study — live deployment currently unavailable.**
 
-**A multi-tenant Next.js workflow that generates structured content with OpenAI, keeps results reviewable, and delivers approved runs to Google Docs.**
+A multi-tenant Next.js application demonstrating structured content briefs, AI-assisted generation workflows, reviewable outputs, deterministic exports, and Google Docs delivery architecture. Provider-backed generation and delivery require separate configuration and are not represented as independently verified live outcomes.
 
-[Architecture](docs/ARCHITECTURE.md) · [Deployment guide](docs/DEPLOYMENT.md) · [Work with RelayWorks](https://getrelayworks.com/contact/)
+[Architecture](docs/ARCHITECTURE.md) · [API flow](docs/API_FLOW.md) · [Deployment requirements](docs/DEPLOYMENT.md) · [Portfolio](https://getrelayworks.com/work/)
 
-![Portfolio](https://img.shields.io/badge/portfolio-RelayWorks-126355) ![Next.js](https://img.shields.io/badge/Next.js-16-111820) ![OpenAI](https://img.shields.io/badge/OpenAI-Responses%20API-412991)
+## Problem and workflow
 
-</div>
+Content teams often move manually between intake forms, prompts, chat tools, review documents, and shared folders. That makes output inconsistent and obscures which brief, model run, or revision produced a deliverable. This project demonstrates how those steps can be organized into a database-backed workflow while preserving human review.
 
-## Business problem
-
-Content teams often move manually between intake forms, prompts, chat tools, review documents, and shared folders. That makes output inconsistent and hides which brief, model run, or revision produced the final deliverable. This application turns those steps into one traceable workflow while preserving human review.
-
-## Key features
+## What this project demonstrates
 
 - Workspace-scoped briefs, reusable presets, memberships, and saved run history
-- OpenAI Responses API integration with schema-backed structured output
+- OpenAI Responses API integration code with schema-backed structured outputs
 - Safety checks before generation and section-level refinement after generation
 - Deterministic Markdown, plain-text, DOCX, and PDF export paths
-- Google Docs delivery through owner OAuth or a shared-folder service account
-- Email verification, password reset, DB-backed auth rate limiting, and protected routes
-- Per-run delivery state, destination metadata, and external document links
-- Automated tests for auth, tenancy, generation actions, exports, and Google delivery
+- Google Docs integration architecture using owner OAuth or a shared-folder service account
+- Email verification, password reset, database-backed auth rate limiting, and protected routes
+- Per-run job and delivery state, destination metadata, and external-document link storage
+- Automated validation structure for authentication, tenancy, generation actions, exports, and delivery services
 
-## Screenshots
+Implementation in the repository demonstrates these application boundaries. Successful live OpenAI generation or Google Docs delivery is not asserted without separate provider and environment verification.
 
-These local captures use the opt-in seeded demo account and synthetic `North Star Media` workspace. They demonstrate intake and workspace organization only; they do not claim verified OpenAI generation or Google Docs delivery while deployment verification remains blocked.
+## Authentic screenshot
 
-| Product overview | Seeded workspace and brief |
-| --- | --- |
-| ![AI content automation product overview](docs/assets/screenshots/marketing-desktop.png) | ![Synthetic content workspace](docs/assets/screenshots/workspace-brief-desktop.png) |
+This approved capture uses an opt-in seeded account and synthetic workspace data. It demonstrates the structured brief experience only; it does not represent a verified live OpenAI request or Google Docs delivery.
 
-[View the seeded dashboard](docs/assets/screenshots/dashboard-seeded-workspace-desktop.png), [mobile product overview](docs/assets/screenshots/marketing-mobile.png), and [mobile workspace](docs/assets/screenshots/workspace-brief-mobile.png). Safety boundaries are documented in [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md).
+![Structured content brief workflow using verified synthetic workspace data](docs/assets/screenshots/brief-workflow.png)
+
+Additional verified synthetic-data captures: [seeded dashboard](docs/assets/screenshots/dashboard-seeded-workspace-desktop.png), [product overview](docs/assets/screenshots/marketing-desktop.png), [mobile product overview](docs/assets/screenshots/marketing-mobile.png), and [mobile workspace](docs/assets/screenshots/workspace-brief-mobile.png). Capture boundaries are documented in [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    U[Workspace user] --> B[Structured brief]
-    B --> A[Server action and validation]
-    A --> O[OpenAI Responses API]
-    O --> R[Structured run result]
-    R --> P[(PostgreSQL)]
-    R --> X[Markdown / text / DOCX / PDF]
-    R --> G[Google Docs delivery]
-    G --> D[OAuth My Drive or shared service-account folder]
+    U[Workspace user] --> F[Next.js interface]
+    F --> A[Server actions and route handlers]
+    A --> H[NextAuth authorization]
+    A --> P[(PostgreSQL via Prisma)]
+    A --> O[OpenAI Responses API adapter]
+    O --> R[Persisted structured run result]
+    R --> V[Review and refinement]
+    V --> X[Markdown / text / DOCX / PDF]
+    V --> G[Google Docs delivery adapter]
+    G --> D[OAuth My Drive or service-account folder]
 ```
 
-Provider clients are server-only, workspace access is checked before mutations, and persisted run data separates generation from delivery. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/API_FLOW.md`](docs/API_FLOW.md).
+Provider clients remain server-only, workspace access is checked before mutations, and persisted run data separates generation from delivery. Generation, formatting, and Google delivery live in focused server modules rather than UI components. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/API_FLOW.md`](docs/API_FLOW.md).
 
-## Tech stack
+## Technology stack
 
-- Next.js 16, React 19, TypeScript, Tailwind CSS 4
+- Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS 4
 - Prisma and PostgreSQL
-- NextAuth credentials authentication with Prisma adapter
+- NextAuth credentials authentication with Prisma adapter and JWT sessions
 - OpenAI official SDK and Responses API
-- Google APIs SDK for OAuth and Docs delivery
-- Zod, Vitest, Nodemailer, PDFKit, and DOCX
+- Google APIs SDK for OAuth and Google Docs delivery
+- Zod, React Hook Form, Vitest, Nodemailer, PDFKit, and DOCX
 
-## Installation
+## Local evaluation
 
-Prerequisites: Node.js 20.9+, npm, PostgreSQL, and an OpenAI API key.
+Prerequisites: Node.js 20.9+, npm, PostgreSQL, and an OpenAI API key for provider-backed generation.
 
 ```bash
 git clone https://github.com/DevCalebR/ai-content-automation-app-google-docs-delivery.git
@@ -73,17 +69,15 @@ npm ci
 cp .env.example .env
 ```
 
-## Configuration
-
 Required for the core workflow:
 
 - `DATABASE_URL`
 - `OPENAI_API_KEY` and an available `OPENAI_MODEL`
 - `APP_URL`, `NEXTAUTH_URL`, and a unique 32+ character `NEXTAUTH_SECRET`
 
-SMTP enables real verification/reset email. Google OAuth credentials enable owner My Drive delivery; service-account credentials enable the legacy shared-folder path. Keep every unprefixed secret server-side. See [`.env.example`](.env.example).
+SMTP configuration enables real verification and reset email. Google OAuth credentials enable owner My Drive delivery; service-account credentials enable the shared-folder path. Keep secrets server-side and never commit `.env` files. See [`.env.example`](.env.example) for the complete contract.
 
-## Running locally
+Prepare and start a development environment with:
 
 ```bash
 npm run db:generate
@@ -92,61 +86,72 @@ npm run db:seed
 npm run dev
 ```
 
-Open `http://localhost:3000`, create an account, verify it using the configured email path, and create a workspace. Demo seeding is opt-in and requires an explicit local-only password.
+Open `http://localhost:3000`, create an account, follow the configured verification path, and create a workspace. Demo seeding is opt-in and requires evaluator-supplied local-only credentials. Provider-backed paths require the evaluator's own accounts, credentials, quotas, and consent configuration.
 
 ## Validation
 
+The documentation reconciliation was checked with:
+
 ```bash
-npm run validate
+npm run lint
+npm run typecheck
+npm run test
+npm run build
 ```
 
-This runs lint, TypeScript, Vitest, and a production build. Live OpenAI and Google Workspace behavior should also follow [`docs/MANUAL_QA_CHECKLIST.md`](docs/MANUAL_QA_CHECKLIST.md).
+Verified results for this documentation PR:
 
-The full test suite expects the required environment values and a reachable, disposable PostgreSQL test database. It does not silently replace missing credentials or persistence with mocks.
+- Lint passed.
+- Typecheck passed.
+- The production build passed with non-secret local validation values.
+- Twenty-nine tests passed before environment-dependent failures.
+- The remaining tests require the repository's runtime variables and a reachable, disposable PostgreSQL test database.
 
-## Deployment
+The database-dependent limitation is configuration-related and was not bypassed with application changes or persistence mocks. Live OpenAI and Google Workspace behavior also requires the manual checks in [`docs/MANUAL_QA_CHECKLIST.md`](docs/MANUAL_QA_CHECKLIST.md).
 
-Use a persistent PostgreSQL database and inject all secrets through the hosting platform. Run `npm run db:migrate:deploy` during release, configure the canonical URLs and Google OAuth redirect URI, and verify email delivery before enabling sign-up. The complete sequence is in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+## Deployment requirements
+
+The live deployment is currently unavailable. A future deployment requires persistent PostgreSQL, hosting-platform secrets, deployed database migrations, canonical application/authentication URLs, an approved Google OAuth redirect URI where OAuth is used, and verified email delivery before public sign-up. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) and [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
 
 ## Project structure
 
 ```text
 app/                 Marketing, authentication, workspace UI, and server actions
-lib/ai/              Prompt composition, safety, and OpenAI generation
+components/          Brief, result, settings, and shared interface components
+lib/ai/              Prompt composition, safety, and OpenAI generation adapter
 lib/auth/            Credentials, sessions, verification, reset, and rate limits
+lib/data/            Workspace-scoped query helpers
 lib/google-docs/     OAuth, service-account, formatting, and delivery adapters
 lib/results/         Export and refinement services
 lib/validations/     Runtime schemas at trust boundaries
-prisma/              Data model, migrations, and optional seed data
+prisma/              Data model, migrations, and optional synthetic seed data
 tests/               Auth, tenancy, workflow, delivery, export, and UI tests
-docs/                Architecture, API flow, release, QA, and troubleshooting
+docs/                Architecture, API flow, release, QA, screenshots, and troubleshooting
 ```
 
 ## Design decisions
 
-- Structured briefs and outputs make runs reproducible and easier to validate than free-form chat.
-- Generation results are persisted before delivery so a provider failure does not erase work.
+- Structured briefs and outputs make runs easier to review than free-form chat alone.
+- Generation results are persisted before delivery so a provider failure does not erase saved work.
 - Workspace ownership is checked server-side for actions and delivery configuration.
-- Owner OAuth is preferred for My Drive; the service-account path remains for shared-folder deployments.
+- Owner OAuth is preferred for My Drive; the service-account path supports shared-folder deployments.
 - Billing and quotas are excluded because they are not required to demonstrate the workflow.
 
-## Known limitations
+## Status and limitations
 
+- Code and architecture case study — live deployment currently unavailable.
+- PostgreSQL and the documented runtime environment are required for the complete test suite.
+- OpenAI provider configuration is required for generation; successful live generation is not asserted here.
+- Google API configuration and separate manual verification are required for delivery; successful live delivery is not asserted here.
+- Public screenshots use seeded or synthetic workspace data and do not show provider-success states.
 - Long generations run in the request lifecycle; there is no durable background queue.
-- OAuth reconnect and revoke experiences need more production polish.
-- Live Google Workspace behavior requires manual provider testing outside the automated suite.
-- The app does not claim autonomous publishing, campaign performance, or fully automated approval.
-
-## Roadmap
-
-- Capture a synthetic end-to-end brief, review, and Google Docs delivery walkthrough
-- Add durable background execution when generation volume justifies it
-- Expand live Google integration coverage and reconnect handling
+- OAuth reconnect and revoke experiences need broader live-provider validation.
+- The application does not claim autonomous publishing, campaign performance, or fully automated approval.
 
 ## License
 
 Copyright © 2026 Caleb Rogers. All rights reserved. See [`LICENSE`](LICENSE).
 
-## Work with me
+## Portfolio links
 
-This project demonstrates AI workflow design, multi-tenant SaaS foundations, document export, and Google API integration. To discuss a similar automation, [contact RelayWorks](https://getrelayworks.com/contact/) or review [DevCalebR on GitHub](https://github.com/DevCalebR).
+Review the [DevCalebR GitHub profile](https://github.com/DevCalebR) or [selected RelayWorks engineering work](https://getrelayworks.com/work/).
