@@ -1,214 +1,110 @@
-# AI Content Automation App with Google Docs Delivery
+# AI Content Automation with Google Docs Delivery
 
-The app now covers the production SaaS foundation plus the first delivery workflow. A signed-in user can create a workspace, save structured content briefs, reuse presets, launch a real OpenAI-backed generation run, export a saved run as markdown or plain text, and deliver that run to Google Docs through a workspace-managed connection.
+**Code and architecture case study — live deployment currently unavailable.**
 
-## Stack
+A multi-tenant Next.js application for turning structured content briefs into reviewable AI-assisted outputs, deterministic exports, and Google Docs delivery workflows.
 
-- Next.js App Router
-- TypeScript
-- Tailwind CSS v4
-- Prisma + PostgreSQL
-- NextAuth credentials auth + Prisma adapter
-- Zod validation
-- OpenAI official SDK with the Responses API
-- Google Docs API via the official `googleapis` SDK
+[Architecture](docs/ARCHITECTURE.md) · [API flow](docs/API_FLOW.md) · [Deployment guide](docs/DEPLOYMENT.md)
 
-## Why this auth choice
+## What this project demonstrates
 
-The app uses `next-auth` credentials auth with the Prisma adapter and JWT-backed sessions because it is production-capable, works cleanly with App Router, keeps identity data in the same durable database model as the rest of the product, and avoids the credentials-provider restriction on database session strategy.
+Content teams need more than a single prompt box. They need consistent briefs, repeatable generation rules, saved run history, reviewable outputs, and a controlled path into the tools where editing continues. This repository demonstrates that workflow as an inspectable full-stack codebase.
 
-The sign-up flow is intentionally secure: after registration, the server redirects the user to `/sign-in` with a success state. The raw password is never returned from the server to the client. Email verification, password reset, and database-backed auth rate limiting are included.
+- Structured brief creation, editing, duplication, and reusable presets
+- Persisted generation runs with schema-backed OpenAI Responses API outputs
+- Section-level review and refinement tools
+- Deterministic Markdown, text, DOCX, and PDF exports
+- Google Docs delivery through user OAuth or a service-account workflow
+- Workspace-scoped data access, authentication, email verification, and password reset
+- Durable PostgreSQL models for workspaces, memberships, briefs, runs, outputs, usage events, connections, and deliveries
 
-## Current product slice
+## Screenshot
 
-- Landing page and polished SaaS app shell
-- Sign up, sign in, sign out, protected routes, and first-run onboarding
-- Durable data models for users, workspaces, memberships, presets, content briefs, generation runs, structured outputs, usage events, and integration placeholders
-- Seeded system presets:
-  - Real Estate
-  - Coach / Consultant
-  - SaaS / Productized Service
-  - E-commerce
-  - Local Business
-  - Creator Brand
-- Structured brief intake with save, edit, and duplicate flows
-- Real OpenAI generation path using structured outputs
-- Saved run history and results workspace with section-level copy actions
-- Deterministic run exports as markdown and plain text
-- Google Docs delivery through either:
-  - workspace-owner Google OAuth for My Drive folders
-  - legacy shared-folder delivery through a service account
+The screenshot below uses a synthetic workspace and repository seed data. It does not represent a verified live OpenAI request or Google Docs delivery.
 
-## Local setup
+![Structured content brief workflow using synthetic data](docs/assets/screenshots/brief-workflow.png)
 
-1. Install dependencies:
+## Architecture
 
-```bash
-npm install
+```mermaid
+flowchart LR
+    U[Signed-in user] --> B[Structured brief]
+    B --> R[Generation run]
+    R --> O[OpenAI Responses API adapter]
+    O --> S[(Persisted structured output)]
+    S --> V[Review and refinement]
+    V --> E[Markdown, text, DOCX, and PDF]
+    V --> G[Google Docs delivery adapter]
 ```
 
-2. Copy `.env.example` into `.env` and fill in:
+Server actions validate ownership before reading or changing workspace data. Generation, formatting, and Google delivery are separated into focused server modules so provider behavior does not leak into UI components. See [the full architecture overview](docs/ARCHITECTURE.md).
 
-```env
-# Core runtime
-DATABASE_URL=
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.4-mini
-APP_URL=http://localhost:3000
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=replace-with-a-32-character-secret
+## Technology stack
 
-# Auth email flows (required if you want real sign-up / verification / reset email delivery)
-EMAIL_FROM=AI Content Automation <no-reply@example.com>
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASSWORD=
-SMTP_SECURE=false
+- Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS 4
+- Prisma and PostgreSQL
+- NextAuth credentials authentication with JWT sessions
+- OpenAI official SDK and schema-backed structured outputs
+- Google APIs SDK for OAuth and Google Docs delivery
+- React Hook Form and Zod validation
+- Vitest for focused service, authorization, route, and UI tests
 
-# Google OAuth / My Drive delivery (optional)
-GOOGLE_OAUTH_CLIENT_ID=
-GOOGLE_OAUTH_CLIENT_SECRET=
+## Local evaluation
 
-# Legacy Google Docs service-account delivery (optional)
-GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL=
-GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY=
-
-# Tooling / local only
-DIRECT_DATABASE_URL=
-NODE_ENV=development
-SEED_DEMO_ACCOUNT=false
-SEED_DEMO_EMAIL=demo@example.com
-SEED_DEMO_PASSWORD=Phase1DemoPass!
-```
-
-`DIRECT_DATABASE_URL` is only needed for Prisma workflows when your database provider
-requires a direct connection. The app runtime itself only needs `DATABASE_URL`.
-
-3. Generate the Prisma client and run migrations:
+Prerequisites: Node.js 20+, npm, and PostgreSQL.
 
 ```bash
+git clone https://github.com/DevCalebR/ai-content-automation-app-google-docs-delivery.git
+cd ai-content-automation-app-google-docs-delivery
+npm ci
+cp .env.example .env
 npm run db:generate
-npm run db:migrate:dev -- --name init
-```
-
-4. Seed the system presets:
-
-```bash
+npm run db:migrate:deploy
 npm run db:seed
-```
-
-5. Start the app:
-
-```bash
 npm run dev
 ```
 
-## Useful scripts
+Fill only the variables needed for the path you are evaluating. OpenAI generation, transactional email, Google OAuth, and service-account delivery require separate provider configuration. Never commit `.env` files or live credentials.
+
+For a local UI review without provider-backed generation or delivery, set `SEED_DEMO_ACCOUNT=true` and provide your own local-only demo credentials in `.env` before seeding.
+
+## Project structure
+
+```text
+app/                  Marketing, authentication, workspace, and delivery routes
+components/           Brief, results, settings, and shared interface components
+lib/ai/               Prompt composition, safety checks, and generation adapter
+lib/auth/             Registration, sessions, verification, reset, and rate limits
+lib/data/             Workspace-scoped query helpers
+lib/google-docs/      OAuth, service-account, presentation, and delivery services
+lib/results/          Deterministic output and export formatting
+prisma/               Schema, migrations, and synthetic seed data
+tests/                Auth, tenancy, generation, exports, and delivery coverage
+docs/                 Architecture, API flow, deployment, and QA notes
+```
+
+## Validation
 
 ```bash
-npm run dev
 npm run lint
 npm run typecheck
 npm run test
-npm run validate
-npm run db:generate
-npm run db:migrate
-npm run db:migrate:deploy
-npm run db:seed
-npm run db:studio
 npm run build
 ```
 
-## App routes
+## Status and limitations
 
-- `/` marketing site
-- `/sign-in` auth
-- `/sign-up` auth
-- `/verify-email` email verification landing
-- `/verify-email/resend` resend verification flow
-- `/forgot-password` password reset request
-- `/reset-password` password reset completion
-- `/app` dashboard
-- `/app/onboarding` workspace creation
-- `/app/workspaces/[workspaceId]` structured brief intake + saved briefs
-- `/app/workspaces/[workspaceId]/generate` run launch
-- `/app/workspaces/[workspaceId]/history` saved run history
-- `/app/workspaces/[workspaceId]/results/[runId]` results workspace, exports, and delivery actions
-- `/app/workspaces/[workspaceId]/results/[runId]/download` markdown/plain-text export route
-- `/app/workspaces/[workspaceId]/settings` workspace settings and Google Docs delivery configuration
+- Code and architecture case study — live deployment currently unavailable.
+- Live OpenAI generation and Google Docs delivery were not used to produce the public screenshot.
+- Provider-backed paths require the evaluator's own accounts, credentials, quotas, and consent configuration.
+- Generation currently runs in the request workflow rather than a durable background queue.
+- OAuth refresh and reconnect behavior needs broader live-provider validation before deployment.
+- Billing and quota enforcement are not included.
 
-## Generation architecture
+## License
 
-The OpenAI integration is deliberately separated into small server modules:
+No open-source license is currently granted. Review the repository contents for evaluation only unless the owner provides separate permission.
 
-- `lib/ai/client.ts` initializes the official SDK server-side only
-- `lib/ai/prompts.ts` separates system instructions, preset instructions, and user brief composition
-- `lib/ai/safety.ts` applies pre-generation guardrails
-- `lib/ai/generate.ts` calls the Responses API with schema-backed parsing
-- `lib/validations/generation.ts` defines the normalized output contract
+## Related work
 
-Each saved run stores:
-
-- campaign summary
-- sample calendar entries
-- sample captions
-- hashtag sets
-- image prompts
-
-## Google Docs delivery
-
-The app now supports two workspace delivery modes:
-
-1. Preferred My Drive path:
-   - Add `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` to the server environment.
-   - Open `/app/workspaces/[workspaceId]/settings`.
-   - Connect a Google account in the My Drive section.
-   - Save the target folder ID for that connected account.
-   - Completed runs will create a Google Doc directly in that folder.
-2. Legacy shared-folder path:
-   - Add `GOOGLE_DOCS_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_DOCS_SERVICE_ACCOUNT_PRIVATE_KEY`.
-   - Share a Drive folder with the service account.
-   - Save that folder ID in the service account section of workspace settings.
-
-Both modes store delivery state in `RunDelivery`. The current active delivery mode is selected when the owner saves a folder in settings.
-
-## Data model summary
-
-- `User` owns auth identity and sessions
-- `Workspace` is the tenant boundary for briefs, runs, outputs, and integration state
-- `WorkspaceMembership` records ownership and future team expansion
-- `Preset` supports system presets and future workspace-scoped presets
-- `ContentBrief` stores normalized brief fields plus a JSON snapshot
-- `GenerationRun` tracks run status, model, errors, and output linkage
-- `StructuredOutput` stores the normalized generated result
-- `RunDelivery` stores per-run delivery status, destination metadata, and the external Google Docs link
-- `UsageEvent` is the audit-friendly event placeholder
-- `IntegrationConnection` stores the active Google Docs delivery mode, OAuth tokens, and folder configuration
-
-## Seed notes
-
-`npm run db:seed` always installs the system presets. If `SEED_DEMO_ACCOUNT=true`, it also creates a demo user, workspace, and starter brief for local review.
-
-## Test stack
-
-Focused hardening tests use Vitest in Node mode. The current suite covers secure sign-up redirects, email verification gating, password reset, DB-backed auth rate limiting, explicit workspace owner creation, owner/member authorization boundaries, membership default roles, workspace access checks, deterministic export formatting, and Google Docs delivery state changes.
-
-## Validation used for the current build
-
-- `npm install`
-- `npm run db:migrate:dev -- --name phase3_exports_and_delivery`
-- `npm run db:seed`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-
-## Next candidates
-
-- background job execution for long generations
-- billing and quota enforcement
-- richer output families such as carousels and scripts
-- OAuth token refresh persistence and reconnect/revoke UX polish
-- stronger Google Docs integration coverage against a live Google Workspace test account
-- deeper run comparison and approval workflows
+For another document-oriented AI workflow, inspect the [RelayWorks Document Processing Showcase](https://github.com/DevCalebR/relayworks-document-processing-showcase). More engineering work is available through [RelayWorks](https://getrelayworks.com/work/).
